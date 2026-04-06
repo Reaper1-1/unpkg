@@ -57,6 +57,19 @@ describe("npm files", () => {
       expect(file.type).toBe("text/javascript");
       expect(file.integrity).toMatch(/^sha256-[A-Za-z0-9+/=]{43}=$/);
     });
+
+    it("fetches a single file from lodash-4.17.21.tgz (1054 files)", async () => {
+      let file = (await getFile(
+        publicNpmRegistry,
+        "lodash",
+        "4.17.21",
+        "/lodash.js"
+      )) as PackageFile;
+      expect(file).not.toBeNull();
+      expect(file.path).toBe("/lodash.js");
+      expect(file.type).toBe("text/javascript");
+      expect(file.integrity).toMatch(/^sha256-[A-Za-z0-9+/=]{43}=$/);
+    });
   });
 
   describe("listFiles", () => {
