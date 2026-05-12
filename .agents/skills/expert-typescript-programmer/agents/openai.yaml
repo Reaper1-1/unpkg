@@ -1,0 +1,6 @@
+interface:
+  display_name: "Expert TypeScript Programmer"
+  short_description: "Robust, efficient TypeScript feature work"
+  default_prompt: "Use $expert-typescript-programmer to implement this TypeScript feature with robust types and efficient compiler-friendly design."
+policy:
+  allow_implicit_invocation: true
