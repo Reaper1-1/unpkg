@@ -391,8 +391,10 @@ export async function bundleSource(
     throw new Error(`No bundled output generated for ${packageName}@${version}${filename}`);
   }
 
+  let commonJsExportNames = new Set([...collectCommonJsExportNames(code), ...collectCommonJsExportNames(output.text)]);
+
   return {
-    code: addCommonJsNamedExports(output.text, collectCommonJsExportNames(code)),
+    code: addCommonJsNamedExports(output.text, Array.from(commonJsExportNames).sort()),
   };
 }
 
@@ -565,8 +567,64 @@ function collectCommonJsExportNames(code: string): string[] {
   for (let match of code.matchAll(/\b(?:exports|module\.exports)\.([A-Za-z_$][\w$]*)\s*=/g)) {
     names.add(match[1]);
   }
+  for (let objectBody of collectModuleExportsObjectBodies(code)) {
+    for (let property of objectBody.matchAll(/(?:^|,)\s*([A-Za-z_$][\w$]*)\s*(?=\s*(?:[:,]|$))/g)) {
+      names.add(property[1]);
+    }
+  }
 
   return Array.from(names).sort();
+}
+
+function collectModuleExportsObjectBodies(code: string): string[] {
+  let bodies: string[] = [];
+  let pattern = /\bmodule\.exports\s*=\s*{/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(code)) != null) {
+    let objectStart = pattern.lastIndex - 1;
+    let objectEnd = findMatchingBrace(code, objectStart);
+    if (objectEnd !== -1) {
+      bodies.push(code.slice(objectStart + 1, objectEnd));
+      pattern.lastIndex = objectEnd + 1;
+    }
+  }
+
+  return bodies;
+}
+
+function findMatchingBrace(code: string, openIndex: number): number {
+  let depth = 0;
+  let quote: string | null = null;
+  let escaped = false;
+
+  for (let index = openIndex; index < code.length; index += 1) {
+    let char = code[index];
+
+    if (quote != null) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+
+    if (char === '"' || char === "'" || char === "`") {
+      quote = char;
+    } else if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return index;
+      }
+    }
+  }
+
+  return -1;
 }
 
 function addCommonJsNamedExports(code: string, exportNames: string[]): string {
@@ -623,6 +681,10 @@ function createPackageInternalBundlePlugin(
               path: resolved,
               namespace: "unpkg-package",
             };
+          }
+
+          if (args.kind !== "require-call") {
+            return { path: args.path, external: true };
           }
 
           return {
@@ -809,10 +871,31 @@ async function rewriteEsmSpecifier(
 
 function createDependencySearch(options: NormalizedBuildOptions): string {
   let searchParams = new URLSearchParams();
+  if (options.env === "development") {
+    searchParams.set("dev", "");
+  }
+  if (options.target !== "es2022") {
+    searchParams.set("target", options.target);
+  }
+  if (options.conditions.length > 0) {
+    searchParams.set("conditions", options.conditions.join(","));
+  }
   if (options.bundleMode === "bundle") {
     searchParams.set("bundle", "");
   } else if (options.bundleMode === "standalone") {
     searchParams.set("standalone", "");
+  }
+  if (options.ignoreAnnotations) {
+    searchParams.set("ignore-annotations", "");
+  }
+  if (options.keepNames) {
+    searchParams.set("keep-names", "");
+  }
+  if (options.minify) {
+    searchParams.set("min", "");
+  }
+  if (options.sourcemap) {
+    searchParams.set("sourcemap", "");
   }
   if (options.external.length > 0) {
     searchParams.set("external", options.external.join(","));

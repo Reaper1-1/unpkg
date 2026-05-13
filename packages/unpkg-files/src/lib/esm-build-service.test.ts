@@ -186,6 +186,21 @@ describe("rewriteEsmImports", () => {
     );
   });
 
+  it("propagates build options to rewritten dependencies", async () => {
+    let code = 'import React from "react";';
+    let result = await rewriteEsmImports(
+      code,
+      registry,
+      "https://esm.unpkg.com",
+      { react: "^18" },
+      options("dev&target=es2017&conditions=browser,development&keep-names&ignore-annotations&min&sourcemap")
+    );
+
+    expect(result).toBe(
+      'import React from "https://esm.unpkg.com/react@18.3.1?dev=&target=es2017&conditions=browser%2Cdevelopment&ignore-annotations=&keep-names=&min=&sourcemap=";'
+    );
+  });
+
   it("propagates standalone mode to rewritten dependencies", async () => {
     let code = 'import React from "react";';
     let result = await rewriteEsmImports(code, registry, "https://esm.unpkg.com", { react: "^18" }, options("standalone"));
@@ -361,6 +376,58 @@ describe("bundleSource", () => {
 
       expect(result.code).not.toContain('Dynamic require of "react"');
       expect(result.code).toContain('from "react"');
+    } finally {
+      await rm(packageDirectory, { force: true, recursive: true });
+    }
+  });
+
+  it("adds named exports from bundled CommonJS modules", async () => {
+    let packageDirectory = await mkdtemp(path.join(tmpdir(), "unpkg-esm-bundled-cjs-exports-"));
+
+    try {
+      await writeFile(path.join(packageDirectory, "production.js"), "exports.createContext = () => 'ok';");
+      let result = await bundleSource(
+        packageDirectory,
+        { name: "bundled-cjs-exports-package" },
+        "bundled-cjs-exports-package",
+        "1.0.0",
+        "/index.js",
+        "module.exports = require('./production.js');",
+        options()
+      );
+
+      expect(result.code).toContain("export const createContext = __unpkg_cjs_default.createContext;");
+    } finally {
+      await rm(packageDirectory, { force: true, recursive: true });
+    }
+  });
+
+  it("adds named exports from CommonJS object exports", async () => {
+    let result = await transformSource(
+      "const camelCase = () => 'ok'; module.exports = { camelCase, forEach: function () { return { nested: true }; } };",
+      "/index.js",
+      options()
+    );
+
+    expect(result.code).toContain("export const camelCase = __unpkg_cjs_default.camelCase;");
+    expect(result.code).toContain("export const forEach = __unpkg_cjs_default.forEach;");
+  });
+
+  it("preserves ESM dependency re-exports as external ESM", async () => {
+    let packageDirectory = await mkdtemp(path.join(tmpdir(), "unpkg-esm-dependency-reexport-"));
+
+    try {
+      let result = await bundleSource(
+        packageDirectory,
+        { name: "dependency-reexport-package" },
+        "dependency-reexport-package",
+        "1.0.0",
+        "/index.js",
+        "export * from 'react';",
+        options()
+      );
+
+      expect(result.code).toContain('export * from "react";');
     } finally {
       await rm(packageDirectory, { force: true, recursive: true });
     }
