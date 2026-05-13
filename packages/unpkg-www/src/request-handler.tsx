@@ -48,7 +48,7 @@ export async function handleRequest(request: Request, env: Env, context: Executi
     return redirect("/", 301);
   }
   if (url.pathname === "/") {
-    return renderPage(env, <Home />, {
+    return renderPage(env, <Home esmOrigin={env.ESM_ORIGIN} origin={env.ORIGIN} />, {
       headers: {
         "Cache-Control": env.DEV ? "no-store" : "public, max-age=60, s-maxage=300",
       },

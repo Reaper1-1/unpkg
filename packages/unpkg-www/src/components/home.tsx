@@ -4,7 +4,7 @@ import { CodeBlock } from "./code-block.tsx";
 import { HomeNav } from "./home-nav.tsx";
 import { Hydrate } from "./hydrate.tsx";
 
-export function Home(): VNode {
+export function Home({ esmOrigin, origin }: { esmOrigin: string; origin: string }): VNode {
   let navItems = {
     overview: "Overview",
     "nobuild-apps": "Nobuild Apps",
@@ -13,6 +13,8 @@ export function Home(): VNode {
     "cache-performance": "Cache Performance",
     about: "About",
   };
+  let url = (pathname: string): string => new URL(pathname, origin).href;
+  let esmUrl = (pathname: string): string => new URL(pathname, esmOrigin).href;
 
   return (
     <Fragment>
@@ -34,7 +36,7 @@ export function Home(): VNode {
 
               <p class="mt-12 p-4 text-center bg-slate-100">
                 <code class="text-sm sm:hidden">unpkg.com/:pkg@:ver/:file</code>
-                <code class="text-sm hidden sm:block">https://unpkg.com/:package@:version/:file</code>
+                <code class="text-sm hidden sm:block">{url("/:package@:version/:file")}</code>
               </p>
 
               <ul class="mt-12 ml-6 list-disc list-outside">
@@ -386,7 +388,7 @@ export function Home(): VNode {
 
               <p class="mt-4">
                 For packages that are not already published as browser-ready ESM files, use{" "}
-                <a class="text-blue-600 hover:underline" href="https://esm.unpkg.com/">
+                <a class="text-blue-600 hover:underline" href={esmUrl("/")}>
                   esm.unpkg.com
                 </a>
                 . This subdomain resolves npm packages, transforms TypeScript and JSX when needed, bundles package
@@ -430,17 +432,17 @@ export function Home(): VNode {
 
               <ul class="mt-4 ml-6 list-disc list-outside">
                 <li>
-                  <a class="text-blue-600 hover:underline break-all" href="https://esm.unpkg.com/preact">
+                  <a class="text-blue-600 hover:underline break-all" href={esmUrl("/preact")}>
                     esm.unpkg.com/preact
                   </a>
                 </li>
                 <li>
-                  <a class="text-blue-600 hover:underline break-all" href="https://esm.unpkg.com/react@18/client">
+                  <a class="text-blue-600 hover:underline break-all" href={esmUrl("/react@18/client")}>
                     esm.unpkg.com/react@18/client
                   </a>
                 </li>
                 <li>
-                  <a class="text-blue-600 hover:underline break-all" href="https://esm.unpkg.com/@floating-ui/dom@1">
+                  <a class="text-blue-600 hover:underline break-all" href={esmUrl("/@floating-ui/dom@1")}>
                     esm.unpkg.com/@floating-ui/dom@1
                   </a>
                 </li>
