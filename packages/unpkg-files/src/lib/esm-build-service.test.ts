@@ -104,7 +104,7 @@ describe("rewriteEsmImports", () => {
     let code = 'import React from "react";';
     let result = await rewriteEsmImports(code, registry, "https://esm.unpkg.com", { react: "^18" }, options("deps=react@18.2.0"));
 
-    expect(result).toBe('import React from "https://esm.unpkg.com/react@18.2.0";');
+    expect(result).toBe('import React from "https://esm.unpkg.com/react@18.2.0?deps=react%4018.2.0";');
   });
 
   it("applies aliases before version resolution", async () => {
@@ -117,7 +117,9 @@ describe("rewriteEsmImports", () => {
       options("alias=react:preact/compat&deps=preact@10.25.4")
     );
 
-    expect(result).toBe('import React from "https://esm.unpkg.com/preact@10.25.4/compat";');
+    expect(result).toBe(
+      'import React from "https://esm.unpkg.com/preact@10.25.4/compat?deps=preact%4010.25.4&alias=react%3Apreact%2Fcompat";'
+    );
   });
 
   it("keeps externalized dependencies as bare specifiers", async () => {
@@ -125,6 +127,28 @@ describe("rewriteEsmImports", () => {
     let result = await rewriteEsmImports(code, registry, "https://esm.unpkg.com", { react: "^18" }, options("external=react"));
 
     expect(result).toBe('import React from "react";');
+  });
+
+  it("propagates dependency graph controls to rewritten dependencies", async () => {
+    let code = 'import React from "react";';
+    let result = await rewriteEsmImports(
+      code,
+      registry,
+      "https://esm.unpkg.com",
+      { react: "^18" },
+      options("bundle&deps=react@18.2.0&alias=react:preact/compat&external=react-dom")
+    );
+
+    expect(result).toBe(
+      'import React from "https://esm.unpkg.com/preact@10.26.4/compat?bundle=&external=react-dom&deps=react%4018.2.0&alias=react%3Apreact%2Fcompat";'
+    );
+  });
+
+  it("propagates standalone mode to rewritten dependencies", async () => {
+    let code = 'import React from "react";';
+    let result = await rewriteEsmImports(code, registry, "https://esm.unpkg.com", { react: "^18" }, options("standalone"));
+
+    expect(result).toBe('import React from "https://esm.unpkg.com/react@18.3.1?standalone=";');
   });
 
   it("rewrites local imports with the active target", async () => {

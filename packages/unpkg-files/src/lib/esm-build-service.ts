@@ -157,6 +157,7 @@ export async function buildEsmModule(registry: string, request: BuildRequest): P
     headers: {
       "Cache-Control": "public, max-age=31536000, immutable",
       "Content-Type": "application/javascript; charset=utf-8",
+      "X-UNPKG-Bundle-Mode": request.options.bundleMode,
       "X-UNPKG-Build-Key": buildKey,
       "X-UNPKG-Build-Input": filename,
       "X-UNPKG-Transformer": "esbuild",
@@ -182,6 +183,7 @@ export async function transformInlineEsmModule(registry: string, request: Inline
     headers: {
       "Cache-Control": "public, max-age=31536000, immutable",
       "Content-Type": "application/javascript; charset=utf-8",
+      "X-UNPKG-Bundle-Mode": request.options.bundleMode,
       "X-UNPKG-Build-Key": buildKey,
       "X-UNPKG-Build-Input": request.filename,
       "X-UNPKG-Transformer": "esbuild",
@@ -633,12 +635,41 @@ async function rewriteEsmSpecifier(
       dependencies[aliased.packageName] ??
       "latest";
     let version = await resolveDependencyVersion(registry, aliased.packageName, requestedVersion);
-    let search = options.external.length > 0 ? `?external=${encodeURIComponent(options.external.join(","))}` : "";
+    let search = createDependencySearch(options);
 
     return `${origin}/${aliased.packageName}@${version}${stripTrailingSlash(aliased.path)}${search}`;
   }
 
   return `${stripTrailingSlash(specifier)}?target=${options.target}`;
+}
+
+function createDependencySearch(options: NormalizedBuildOptions): string {
+  let searchParams = new URLSearchParams();
+  if (options.bundleMode === "bundle") {
+    searchParams.set("bundle", "");
+  } else if (options.bundleMode === "standalone") {
+    searchParams.set("standalone", "");
+  }
+  if (options.external.length > 0) {
+    searchParams.set("external", options.external.join(","));
+  }
+
+  let dependencyOverrides = Object.entries(options.dependencyOverrides)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([packageName, version]) => `${packageName}@${version}`);
+  if (dependencyOverrides.length > 0) {
+    searchParams.set("deps", dependencyOverrides.join(","));
+  }
+
+  let aliases = Object.entries(options.aliases)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([from, to]) => `${from}:${to}`);
+  if (aliases.length > 0) {
+    searchParams.set("alias", aliases.join(","));
+  }
+
+  let search = searchParams.toString();
+  return search === "" ? "" : `?${search}`;
 }
 
 function shouldExternalize(packageName: string, external: string[]): boolean {
