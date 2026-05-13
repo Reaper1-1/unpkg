@@ -1,3 +1,5 @@
+import highlight from "highlight.js/lib/common";
+
 import {
   getEsmPackageSubpath,
   getPackageInfo,
@@ -11,6 +13,14 @@ import type { Env } from "./env.ts";
 
 const publicNpmRegistry = "https://registry.npmjs.org";
 const moduleCacheControl = "public, max-age=60, s-maxage=300";
+const homePageExample = `<script type="module">
+  import React from "%%ESM_ORIGIN%%/react@18.3.1";
+  import { createRoot } from "%%ESM_ORIGIN%%/react-dom@18.3.1/client";
+
+  createRoot(document.getElementById("root")).render(
+    React.createElement("h1", null, "Hello from esm.unpkg.com")
+  );
+</script>`;
 
 export async function handleRequest(request: Request, env: Env, context: ExecutionContext): Promise<Response> {
   let url = new URL(request.url);
@@ -614,6 +624,7 @@ function corsHeaders(headers?: HeadersInit): HeadersInit {
 function createHomePage(env: Env): string {
   let wwwOrigin = env.WWW_ORIGIN.replace(/\/+$/, "");
   let esmOrigin = env.ORIGIN.replace(/\/+$/, "");
+  let exampleHtml = highlightCode(homePageExample.replaceAll("%%ESM_ORIGIN%%", esmOrigin));
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -706,6 +717,65 @@ function createHomePage(env: Env): string {
       padding: 0;
       white-space: pre;
     }
+    .hljs-listing {
+      background: #fbfdff;
+      color: #383a42;
+    }
+    .hljs-comment,
+    .hljs-quote {
+      color: #a0a1a7;
+      font-style: italic;
+    }
+    .hljs-doctag,
+    .hljs-keyword,
+    .hljs-link,
+    .hljs-formula {
+      color: #a626a4;
+    }
+    .hljs-section,
+    .hljs-name,
+    .hljs-selector-tag,
+    .hljs-deletion,
+    .hljs-subst {
+      color: #e45649;
+    }
+    .hljs-literal {
+      color: #0184bb;
+    }
+    .hljs-string,
+    .hljs-regexp,
+    .hljs-addition,
+    .hljs-attribute,
+    .hljs-meta-string {
+      color: #50a14f;
+    }
+    .hljs-built_in,
+    .hljs-class .hljs-title {
+      color: #c18401;
+    }
+    .hljs-attr,
+    .hljs-variable,
+    .hljs-template-variable,
+    .hljs-type,
+    .hljs-selector-class,
+    .hljs-selector-attr,
+    .hljs-selector-pseudo,
+    .hljs-number {
+      color: #986801;
+    }
+    .hljs-symbol,
+    .hljs-bullet,
+    .hljs-meta,
+    .hljs-selector-id,
+    .hljs-title {
+      color: #4078f2;
+    }
+    .hljs-emphasis {
+      font-style: italic;
+    }
+    .hljs-strong {
+      font-weight: bold;
+    }
     .callout {
       margin-top: 3rem;
       background: #f1f5f9;
@@ -748,14 +818,7 @@ function createHomePage(env: Env): string {
         <h2>Example</h2>
         <p>Import packages from <code>esm.unpkg.com</code> in a module script:</p>
 
-        <div class="code-block"><code>&lt;script type="module"&gt;
-  import React from "${esmOrigin}/react@18.3.1";
-  import { createRoot } from "${esmOrigin}/react-dom@18.3.1/client";
-
-  createRoot(document.getElementById("root")).render(
-    React.createElement("h1", null, "Hello from esm.unpkg.com")
-  );
-&lt;/script&gt;</code></div>
+        <div class="code-block hljs-listing"><code>${exampleHtml}</code></div>
       </section>
 
       <section>
@@ -786,6 +849,10 @@ function createHomePage(env: Env): string {
   </footer>
 </body>
 </html>`;
+}
+
+function highlightCode(code: string): string {
+  return highlight.highlight(code, { language: "xml" }).value;
 }
 
 function redirect(location: string | URL, init?: ResponseInit | number): Response {
