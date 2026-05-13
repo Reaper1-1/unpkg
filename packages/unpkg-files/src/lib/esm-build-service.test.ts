@@ -64,6 +64,27 @@ describe("resolveBuildFilename", () => {
     expect(resolveBuildFilename(packageJson, undefined, options("target=node"))).toBe("/node.js");
     expect(resolveBuildFilename(packageJson, undefined, options("target=deno"))).toBe("/deno.js");
   });
+
+  it("resolves exported subpaths before building", () => {
+    expect(
+      resolveBuildFilename(
+        {
+          exports: {
+            "./client": {
+              browser: "./client.browser.js",
+              import: "./client.js",
+            },
+          },
+        },
+        "/client",
+        options()
+      )
+    ).toBe("/client.browser.js");
+  });
+
+  it("falls back to explicit filenames when no export matches", () => {
+    expect(resolveBuildFilename(packageJson, "/dist/index.js", options())).toBe("/dist/index.js");
+  });
 });
 
 describe("rewriteEsmImports", () => {

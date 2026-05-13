@@ -80,6 +80,7 @@ interface CompatSummary {
 
 interface RunOptions {
   concurrency: number;
+  skipBaseline: boolean;
   timeoutMs: number;
 }
 
@@ -224,7 +225,7 @@ async function loadCorpus(corpusPath: string | null): Promise<CompatCorpus> {
 async function runCases(cases: CompatCase[], options: RunOptions): Promise<CompatResult[]> {
   let firstBatchSize = Math.min(options.concurrency, cases.length);
   let firstBatch = await runCaseBatch(cases.slice(0, firstBatchSize), options);
-  let unreachableOrigin = findUnreachableOrigin(firstBatch);
+  let unreachableOrigin = findUnreachableOrigin(firstBatch, options);
   if (unreachableOrigin != null) {
     console.error(
       `Unable to connect to ${unreachableOrigin} in the first ${firstBatch.length} compatibility checks. ` +
@@ -248,7 +249,9 @@ async function runCaseBatch(cases: CompatCase[], options: RunOptions): Promise<C
 
 async function runCase(compatCase: CompatCase, options: RunOptions): Promise<CompatResult> {
   let [esmSh, esmUnpkg] = await Promise.all([
-    summarizeFetch(new URL(compatCase.path, esmShOrigin), options),
+    options.skipBaseline
+      ? Promise.resolve(unavailableSummary(new URL(compatCase.path, esmShOrigin).toString()))
+      : summarizeFetch(new URL(compatCase.path, esmShOrigin), options),
     summarizeFetch(new URL(compatCase.path, esmUnpkgOrigin), options),
   ]);
   let comparison = compareSummaries(compatCase, esmSh, esmUnpkg);
@@ -264,6 +267,11 @@ async function runCase(compatCase: CompatCase, options: RunOptions): Promise<Com
 }
 
 async function summarizeFetch(url: URL, options: RunOptions): Promise<FetchSummary> {
+  let controller = new AbortController();
+  return withTimeout(summarizeFetchInner(url, controller.signal), controller, url, options.timeoutMs);
+}
+
+async function summarizeFetchInner(url: URL, signal: AbortSignal): Promise<FetchSummary> {
   let startedAt = performance.now();
   let currentUrl = url;
   let redirectChain: RedirectHop[] = [];
@@ -273,7 +281,7 @@ async function summarizeFetch(url: URL, options: RunOptions): Promise<FetchSumma
     for (let index = 0; index < 10; index += 1) {
       response = await fetch(currentUrl, {
         redirect: "manual",
-        signal: AbortSignal.timeout(options.timeoutMs),
+        signal,
         headers: {
           Accept: "application/javascript, application/json;q=0.9, */*;q=0.1",
         },
@@ -324,6 +332,40 @@ async function summarizeFetch(url: URL, options: RunOptions): Promise<FetchSumma
   };
 }
 
+function withTimeout(
+  promise: Promise<FetchSummary>,
+  controller: AbortController,
+  url: URL,
+  timeoutMs: number
+): Promise<FetchSummary> {
+  let startedAt = performance.now();
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+
+  let timeoutPromise = new Promise<FetchSummary>((resolve) => {
+    timeout = setTimeout(() => {
+      controller.abort();
+      resolve({
+        contentLength: 0,
+        contentType: null,
+        diagnosticCode: "FETCH_ERROR",
+        durationMs: Math.round(performance.now() - startedAt),
+        executableModule: false,
+        finalUrl: url.toString(),
+        headers: {},
+        ok: false,
+        redirectChain: [],
+        status: 0,
+      });
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeout != null) {
+      clearTimeout(timeout);
+    }
+  });
+}
+
 async function summarizeResponse(
   response: Response,
   finalUrl: URL,
@@ -353,23 +395,22 @@ function compareSummaries(
   esmSh: FetchSummary,
   esmUnpkg: FetchSummary
 ): { failureCategory: FailureCategory | null; reason: string | null } {
-  if (esmSh.diagnosticCode === "FETCH_ERROR" || esmUnpkg.diagnosticCode === "FETCH_ERROR") {
+  if (esmUnpkg.diagnosticCode === "FETCH_ERROR") {
     return {
       failureCategory: "fetch-error",
       reason: `fetch error: esm.sh=${esmSh.status}, esm.unpkg.com=${esmUnpkg.status}`,
     };
   }
 
-  if (compatCase.expect === "diagnostic") {
-    return esmUnpkg.status >= 400
-      ? { failureCategory: null, reason: null }
-      : {
-          failureCategory: "unexpected-success",
-          reason: `expected esm.unpkg.com diagnostic, got ${esmUnpkg.status}`,
-        };
+  if (esmSh.diagnosticCode === "FETCH_ERROR" || esmSh.status >= 500) {
+    return validateExpectedBehavior(compatCase, esmUnpkg);
   }
 
-  if (esmSh.status >= 500 || esmUnpkg.status >= 500) {
+  if (compatCase.expect === "diagnostic") {
+    return validateExpectedBehavior(compatCase, esmUnpkg);
+  }
+
+  if (esmUnpkg.status >= 500) {
     return {
       failureCategory: "server-error",
       reason: `server error: esm.sh=${esmSh.status}, esm.unpkg.com=${esmUnpkg.status}`,
@@ -381,6 +422,22 @@ function compareSummaries(
       failureCategory: esmUnpkg.diagnosticCode == null ? "ok-mismatch" : "diagnostic",
       reason: `ok mismatch: esm.sh=${esmSh.status}, esm.unpkg.com=${esmUnpkg.status}`,
     };
+  }
+
+  return validateExpectedBehavior(compatCase, esmUnpkg);
+}
+
+function validateExpectedBehavior(
+  compatCase: CompatCase,
+  esmUnpkg: FetchSummary
+): { failureCategory: FailureCategory | null; reason: string | null } {
+  if (compatCase.expect === "diagnostic") {
+    return esmUnpkg.status >= 400
+      ? { failureCategory: null, reason: null }
+      : {
+          failureCategory: "unexpected-success",
+          reason: `expected esm.unpkg.com diagnostic, got ${esmUnpkg.status}`,
+        };
   }
 
   if (compatCase.expect === "json" && !isJson(esmUnpkg.contentType)) {
@@ -475,6 +532,14 @@ function pendingSummary(finalUrl: string): FetchSummary {
   };
 }
 
+function unavailableSummary(finalUrl: string): FetchSummary {
+  return {
+    ...pendingSummary(finalUrl),
+    diagnosticCode: "FETCH_ERROR",
+    ok: false,
+  };
+}
+
 function printReport(report: CompatReport, jsonOutput: boolean): void {
   if (jsonOutput) {
     console.log(JSON.stringify(report, null, 2));
@@ -503,7 +568,7 @@ function printReport(report: CompatReport, jsonOutput: boolean): void {
   }
 }
 
-function findUnreachableOrigin(results: CompatResult[]): string | null {
+function findUnreachableOrigin(results: CompatResult[], options: RunOptions): string | null {
   if (results.length === 0) {
     return null;
   }
@@ -512,7 +577,7 @@ function findUnreachableOrigin(results: CompatResult[]): string | null {
     return esmUnpkgOrigin;
   }
 
-  if (results.every((result) => result.esmSh.diagnosticCode === "FETCH_ERROR")) {
+  if (!options.skipBaseline && results.every((result) => result.esmSh.diagnosticCode === "FETCH_ERROR")) {
     return esmShOrigin;
   }
 
@@ -623,6 +688,7 @@ function parseArgs(args: string[]): ParsedArgs {
   let concurrency = defaultConcurrency;
   let dryRun = false;
   let jsonOutput = false;
+  let skipBaseline = false;
   let timeoutMs = defaultTimeoutMs;
 
   for (let index = 0; index < args.length; index += 1) {
@@ -631,6 +697,8 @@ function parseArgs(args: string[]): ParsedArgs {
       dryRun = true;
     } else if (arg === "--json") {
       jsonOutput = true;
+    } else if (arg === "--skip-baseline") {
+      skipBaseline = true;
     } else if (arg === "--corpus") {
       corpusPath = args[index + 1] ?? null;
       index += 1;
@@ -651,7 +719,7 @@ function parseArgs(args: string[]): ParsedArgs {
     }
   }
 
-  return { concurrency, corpusPath, dryRun, jsonOutput, timeoutMs };
+  return { concurrency, corpusPath, dryRun, jsonOutput, skipBaseline, timeoutMs };
 }
 
 function parsePositiveInteger(value: string | undefined, name: string): number {

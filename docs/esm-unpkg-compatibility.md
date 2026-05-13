@@ -10,10 +10,18 @@ Run the representative compatibility suite with:
 pnpm test:esm-compat
 ```
 
-By default the runner compares `https://esm.sh` with `https://esm.unpkg.com`. For beta or local validation, override origins:
+By default the runner compares `https://esm.sh` with `https://esm.unpkg.com`. For repeatable corpus runs, prefer the pinned local esm.sh baseline vendored in `vendor/esm.sh` instead of production `https://esm.sh`:
+
+```sh
+pnpm vendor:esm-sh
+pnpm test:esm-compat:local-baseline -- --corpus scripts/esm-compat-corpus.ecosystem.json
+```
+
+For beta or local `esm.unpkg.com` validation, override origins:
 
 ```sh
 ESM_UNPKG_ORIGIN=https://esm-beta.unpkg.com pnpm test:esm-compat
+ESM_SH_ORIGIN=http://localhost:8081 ESM_UNPKG_ORIGIN=http://localhost:3002 pnpm test:esm-compat
 ```
 
 Useful options:
@@ -22,6 +30,7 @@ Useful options:
 - `--dry-run` prints the cases without making network requests.
 - `--json` emits machine-readable results with response headers, redirect chains, diagnostic categories, content lengths, durations, and grouped summaries for dashboards or CI artifacts.
 - `--concurrency <count>` limits live checks to a small number of cases at a time. The default is `6`.
+- `--skip-baseline` skips live `esm.sh` requests and validates only the configured `esm.unpkg.com` origin against each case's expected behavior.
 - `--timeout-ms <ms>` limits each live fetch attempt. The default is `15000`.
 
 Live runs execute an initial batch first. If that batch cannot connect to either origin, the runner exits early instead of attempting the full corpus.

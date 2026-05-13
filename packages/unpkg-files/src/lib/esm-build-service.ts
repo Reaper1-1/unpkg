@@ -409,7 +409,13 @@ export function resolveBuildFilename(
   options: Pick<NormalizedBuildOptions, "conditions" | "env" | "target">
 ): string | null {
   if (filename != null && filename !== "/") {
-    return filename;
+    return (
+      resolvePackageExport(packageJson as Parameters<typeof resolvePackageExport>[0], filename, {
+        conditions: getBuildConditions(options),
+        useBrowserField: !isRuntimeNativeTarget(options.target),
+        useModuleField: packageJson.exports == null,
+      }) ?? filename
+    );
   }
 
   return resolvePackageExport(packageJson as Parameters<typeof resolvePackageExport>[0], "/", {

@@ -12,6 +12,7 @@ This repository powers UNPKG, a CDN and web app for serving npm package files di
 - `packages/unpkg-worker` contains shared Cloudflare Worker utilities used by the worker packages.
 - `scripts` contains repo-level maintenance and compatibility runners, including the ESM compatibility, browser smoke, readiness, and corpus generation tools.
 - `docs` contains product and implementation specs for larger efforts.
+- `vendor/esm.sh` is a pinned local copy of upstream esm.sh used as the compatibility baseline for corpus testing.
 
 ## Runtime And Tooling
 
@@ -36,6 +37,7 @@ This repository powers UNPKG, a CDN and web app for serving npm package files di
 
 - Run the seed compatibility suite with `pnpm test:esm-compat`.
 - Run a corpus with `pnpm test:esm-compat -- --corpus scripts/esm-compat-corpus.ecosystem.json`.
+- Start the local esm.sh baseline with `pnpm vendor:esm-sh`, then compare against it with `pnpm test:esm-compat:local-baseline -- --corpus scripts/esm-compat-corpus.ecosystem.json`.
 - Use `--dry-run` to validate and print corpus cases without network requests.
 - For live runs, set `ESM_UNPKG_ORIGIN` to the local, staging, or beta origin you intend to test. The default is `https://esm.unpkg.com`.
 - The compatibility runner limits live checks with `--concurrency` and `--timeout-ms`, and aborts early when the first batch cannot connect to an origin.

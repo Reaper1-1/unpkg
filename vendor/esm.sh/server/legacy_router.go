@@ -1,0 +1,266 @@
+package server
+
+import (
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/url"
+	"path"
+	"strconv"
+	"strings"
+
+	"github.com/esm-dev/esm.sh/internal/npm"
+	"github.com/esm-dev/esm.sh/internal/storage"
+	"github.com/ije/esbuild-internal/xxhash"
+	"github.com/ije/gox/utils"
+	"github.com/ije/gox/valid"
+	"github.com/ije/rex"
+)
+
+func esmLegacyRouter(fs storage.Storage) rex.Handle {
+	return func(ctx *rex.Context) any {
+		method := ctx.R.Method
+		pathname := ctx.R.URL.Path
+
+	START:
+		// build API (deprecated)
+		if pathname == "/build" {
+			if method == "POST" {
+				return rex.Status(403, "The `/build` API has been deprecated.")
+			}
+			if method == "GET" {
+				ctx.SetHeader("Content-Type", ctJavaScript)
+				ctx.SetHeader("Cache-Control", ccImmutable)
+				return `
+					const deprecated = new Error("[esm.sh] The build API has been deprecated.")
+					export function build(_) { throw deprecated }
+					export function esm(_) { throw deprecated }
+					export function transform(_) { throw deprecated }
+					export default build
+				`
+			}
+			return rex.Status(405, "Method Not Allowed")
+		}
+
+		// `/react-dom@18.3.1?pin=v135`
+		if q := ctx.R.URL.RawQuery; q != "" && (strings.HasPrefix(q, "pin=v") || strings.Contains(q, "&pin=v")) {
+			query := ctx.R.URL.Query()
+			v := query.Get("pin")
+			if len(v) > 1 && v[0] == 'v' && valid.IsDigtalOnlyString(v[1:]) {
+				bv, _ := strconv.Atoi(v[1:])
+				if bv <= 0 || bv > 135 {
+					return rex.Status(400, "Invalid `pin` query")
+				}
+				return legacyESM(ctx, fs, "")
+			}
+		}
+
+		// `/react-dom@18.3.1&pin=v135`
+		if strings.Contains(pathname, "&pin=v") {
+			return legacyESM(ctx, fs, "")
+		}
+
+		// `/stable/react@18.3.1?dev`
+		// `/stable/react@18.3.1/es2022/react.mjs`
+		if strings.HasPrefix(pathname, "/stable/") {
+			return legacyESM(ctx, fs, "stable")
+		}
+
+		// `/v135/react-dom@18.3.1?dev`
+		// `/v135/react-dom@18.3.1/es2022/react-dom.mjs`
+		if strings.HasPrefix(pathname, "/v") {
+			legacyBuildVersion, path := utils.SplitByFirstByte(pathname[2:], '/')
+			if valid.IsDigtalOnlyString(legacyBuildVersion) {
+				bv, _ := strconv.Atoi(legacyBuildVersion)
+				if bv <= 0 || bv > 135 {
+					return rex.Status(400, "Invalid Module Path")
+				}
+				if path == "" && strings.HasPrefix(ctx.UserAgent(), "Deno/") {
+					ctx.SetHeader("Content-Type", ctJavaScript)
+					ctx.SetHeader("Cache-Control", ccImmutable)
+					return `throw new Error("[esm.sh] The deno CLI has been deprecated, please use our vscode extension instead: https://marketplace.visualstudio.com/items?itemName=ije.esm-vscode")`
+				}
+				if path == "build" {
+					pathname = "/build"
+					goto START
+				}
+				return legacyESM(ctx, fs, "v"+legacyBuildVersion)
+			}
+		}
+
+		// packages created by the `/build` API
+		if len(pathname) == 42 && strings.HasPrefix(pathname, "/~") && valid.IsHexString(pathname[2:]) {
+			return redirect(ctx, fmt.Sprintf("/v135%s@0.0.0/%s/mod.mjs", pathname, legacyGetBuildTargetByUA(ctx.UserAgent())), true)
+		}
+
+		return ctx.Next()
+	}
+}
+
+type LegacyBuildMeta struct {
+	EsmId string `json:"esmId,omitempty"`
+	Dts   string `json:"dts,omitempty"`
+	Code  string `json:"code"`
+}
+
+func legacyESM(ctx *rex.Context, fs storage.Storage, buildVersionPrefix string) any {
+	pathname := ctx.R.URL.Path
+	if buildVersionPrefix != "" {
+		pathname = pathname[len(buildVersionPrefix)+1:]
+	}
+	query := ""
+	if ctx.R.URL.RawQuery != "" {
+		query = "?" + ctx.R.URL.RawQuery
+	}
+	var isStatic bool
+	if (strings.HasPrefix(pathname, "/node_") && strings.HasSuffix(pathname, ".js")) || pathname == "/node.ns.d.ts" {
+		isStatic = true
+	} else {
+		if strings.HasPrefix(pathname, "/gh/") {
+			if !strings.ContainsRune(pathname[4:], '/') {
+				return rex.Status(400, "invalid path")
+			}
+			// add a leading `@` to the package name
+			pathname = "/@" + pathname[4:]
+		}
+		pkgName, pkgVersion, subPath := splitEsmPath(pathname)
+		_, target, _ := parseSubPath(subPath)
+		var asteriskFlag bool
+		if len(pkgName) > 1 && pkgName[0] == '*' {
+			asteriskFlag = true
+			pkgName = pkgName[1:]
+		}
+		if !npm.ValidatePackageName(pkgName) {
+			return rex.Status(400, "Invalid Package Name")
+		}
+		var extraQuery string
+		if pkgVersion != "" {
+			pkgVersion, extraQuery = utils.SplitByFirstByte(pkgVersion, '&')
+			if v, e := url.QueryUnescape(pkgVersion); e == nil {
+				pkgVersion = v
+			}
+		}
+		if !npm.IsExactVersion(pkgVersion) {
+			npmrc := DefaultNpmRC()
+			pkgInfo, err := npmrc.getPackageInfo(pkgName, pkgVersion)
+			if err != nil {
+				if strings.Contains(err.Error(), " not found") {
+					return rex.Status(404, err.Error())
+				}
+				return rex.Status(500, err.Error())
+			}
+			var b strings.Builder
+			b.WriteString(getOrigin(ctx))
+			if buildVersionPrefix != "" {
+				b.WriteByte('/')
+				b.WriteString(buildVersionPrefix)
+			}
+			b.WriteByte('/')
+			if asteriskFlag {
+				b.WriteByte('*')
+			}
+			b.WriteString(pkgName)
+			b.WriteByte('@')
+			b.WriteString(pkgInfo.Version)
+			if extraQuery != "" {
+				b.WriteByte('&')
+				b.WriteString(extraQuery)
+			}
+			if len(subPath) > 0 {
+				b.WriteByte('/')
+				b.WriteString(subPath)
+			}
+			b.WriteString(query)
+			return redirect(ctx, b.String(), false)
+		}
+		isStatic = target != ""
+	}
+	savePath := "legacy/" + normalizeSavePath(ctx.R.URL.Path[1:])
+	if (buildVersionPrefix != "" && isStatic) || endsWith(pathname, ".d.ts", ".d.mts") {
+		f, fi, e := fs.Get(savePath)
+		if e != nil && e != storage.ErrNotFound {
+			return rex.Status(500, "Storage error: "+e.Error())
+		}
+		if e == nil {
+			switch path.Ext(pathname) {
+			case ".js", ".mjs":
+				ctx.SetHeader("Content-Type", ctJavaScript)
+			case ".ts", ".mts":
+				ctx.SetHeader("Content-Type", ctTypeScript)
+				// resolve hostname in typescript definition files if the origin is not "https://esm.sh"
+				if endsWith(pathname, ".d.ts", ".d.mts") {
+					origin := getOrigin(ctx)
+					if origin != "https://esm.sh" {
+						defer f.Close()
+						data, err := io.ReadAll(f)
+						if err != nil {
+							return rex.Status(500, "Failed to read data from storage")
+						}
+						data = bytes.ReplaceAll(data, []byte("https://esm.sh/v"), []byte(origin+"/v"))
+						data = bytes.ReplaceAll(data, []byte("https://legacy.esm.sh/v"), []byte(origin+"/v"))
+						return data
+					}
+				}
+			case ".map":
+				ctx.SetHeader("Content-Type", ctJSON)
+			case ".css":
+				ctx.SetHeader("Content-Type", ctCSS)
+			default:
+				f.Close()
+				return rex.Status(404, "Module Not Found")
+			}
+			ctx.SetHeader("Content-Length", strconv.FormatInt(fi.Size(), 10))
+			ctx.SetHeader("Cache-Control", ccImmutable)
+			return f // auto closed
+		}
+	} else {
+		varyUA := false
+		if query != "" {
+			if !ctx.R.URL.Query().Has("target") {
+				varyUA = true
+				savePath += "." + legacyGetBuildTargetByUA(ctx.UserAgent())
+			}
+			h := xxhash.New()
+			h.Write([]byte(query))
+			savePath += "." + base64.RawURLEncoding.EncodeToString(h.Sum(nil))
+		}
+		savePath += ".meta"
+		f, _, e := fs.Get(savePath)
+		if e != nil && e != storage.ErrNotFound {
+			return rex.Status(500, "Storage error: "+e.Error())
+		}
+		if e == nil {
+			defer f.Close()
+			var ret LegacyBuildMeta
+			if json.NewDecoder(f).Decode(&ret) == nil {
+				ctx.SetHeader("Content-Type", ctJavaScript)
+				ctx.SetHeader("Cache-Control", ccImmutable)
+				if varyUA {
+					appendVaryHeader(ctx.W.Header(), "User-Agent")
+				}
+				if ret.EsmId != "" {
+					ctx.SetHeader("X-ESM-Id", ret.EsmId)
+				}
+				if ret.Dts != "" {
+					ctx.SetHeader("X-TypeScript-Types", getOrigin(ctx)+ret.Dts)
+				}
+				return ret.Code
+			}
+		}
+	}
+
+	// strip leading `/stable/*` and `/v<build-version>/*`
+	if buildVersionPrefix != "" {
+		origin := getOrigin(ctx)
+		if strings.HasPrefix(pathname, "/node_") && strings.HasSuffix(pathname, ".js") {
+			pathname = "/node/" + strings.TrimSuffix(strings.TrimPrefix(pathname, "/node_"), ".js") + ".mjs"
+		} else if pathname == "/node.ns.d.ts" {
+			return rex.Status(404, "Not Found")
+		}
+		return redirect(ctx, fmt.Sprintf("%s%s%s", origin, pathname, query), true)
+	}
+
+	return rex.Next()
+}

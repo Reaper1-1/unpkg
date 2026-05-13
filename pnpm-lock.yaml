@@ -100,6 +100,9 @@ importers:
       tar-stream:
         specifier: ^3.1.7
         version: 3.1.7
+      unpkg-worker:
+        specifier: workspace:*
+        version: link:../unpkg-worker
     devDependencies:
       '@types/bun':
         specifier: ^1.2.8
@@ -119,9 +122,6 @@ importers:
       typescript:
         specifier: ^5.7.2
         version: 5.7.2
-      unpkg-worker:
-        specifier: workspace:*
-        version: link:../unpkg-worker
 
   packages/unpkg-worker:
     dependencies:
