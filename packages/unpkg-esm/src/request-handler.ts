@@ -621,373 +621,169 @@ function createHomePage(env: Env): string {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Browser-ready npm package imports from UNPKG.">
-  <title>esm.unpkg.com</title>
+  <title>UNPKG ESM</title>
   <style>
-    :root {
-      color-scheme: light;
-      --bg: #ffffff;
-      --ink: #0f172a;
-      --muted: #475569;
-      --line: #dbe3ec;
-      --soft: #f8fafc;
-      --code: #f1f5f9;
-      --accent: #2563eb;
-      --accent-dark: #1d4ed8;
-      --beta-bg: #fef3c7;
-      --beta-ink: #92400e;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
+    * { box-sizing: border-box; }
     body {
       margin: 0;
-      background: var(--bg);
-      color: var(--ink);
+      color: #0f172a;
+      background: white;
       font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      line-height: 1.6;
+      line-height: 1.625;
     }
-
+    header, main, footer {
+      max-width: 768px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    header {
+      padding: 8rem 2rem 0;
+      text-align: center;
+    }
+    h1 {
+      margin: 0;
+      color: #000;
+      font-size: 4.5rem;
+      line-height: 1;
+      font-weight: 900;
+      letter-spacing: 0;
+    }
+    main {
+      max-width: 100%;
+      padding: 4rem 2rem 8rem;
+    }
+    .content {
+      max-width: 768px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    section + section {
+      margin-top: 4rem;
+    }
+    h2 {
+      margin: 0 0 1rem;
+      color: #0f172a;
+      font-size: 1.25rem;
+      line-height: 1.3;
+      letter-spacing: 0;
+    }
+    p {
+      margin: 1rem 0 0;
+    }
+    ul {
+      margin: 1rem 0 0 1.5rem;
+      padding: 0;
+      list-style: disc outside;
+    }
+    li + li {
+      margin-top: 0.35rem;
+    }
     a {
-      color: var(--accent);
+      color: #2563eb;
       text-decoration: none;
     }
-
     a:hover {
       text-decoration: underline;
     }
-
-    .page {
-      width: min(100%, 1180px);
-      margin: 0 auto;
-      padding: 28px 24px 72px;
-    }
-
-    header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 24px;
-      padding: 10px 0 48px;
-    }
-
-    .brand {
-      display: inline-flex;
-      align-items: baseline;
-      gap: 10px;
-      color: var(--ink);
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: 0;
-    }
-
-    .brand span {
-      color: var(--muted);
-      font-weight: 500;
-    }
-
-    nav {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .hero {
-      display: grid;
-      grid-template-columns: minmax(0, 1.02fr) minmax(320px, 0.98fr);
-      align-items: center;
-      gap: 48px;
-      padding-bottom: 64px;
-      border-bottom: 1px solid var(--line);
-    }
-
-    .eyebrow {
-      display: inline-flex;
-      align-items: center;
-      border-radius: 999px;
-      background: var(--beta-bg);
-      color: var(--beta-ink);
-      font-size: 13px;
-      font-weight: 700;
-      padding: 6px 12px;
-      text-transform: uppercase;
-    }
-
-    h1 {
-      max-width: 780px;
-      margin: 20px 0 18px;
-      font-size: clamp(46px, 8vw, 84px);
-      line-height: 0.94;
-      letter-spacing: 0;
-    }
-
-    .lead {
-      max-width: 680px;
-      color: var(--muted);
-      font-size: 21px;
-      line-height: 1.5;
-    }
-
-    .actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 14px;
-      margin-top: 34px;
-    }
-
-    .button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 44px;
-      border-radius: 8px;
-      padding: 10px 16px;
-      border: 1px solid var(--line);
-      color: var(--ink);
-      font-weight: 650;
-    }
-
-    .button.primary {
-      border-color: var(--accent);
-      background: var(--accent);
-      color: #ffffff;
-    }
-
-    .button.primary:hover {
-      background: var(--accent-dark);
-      text-decoration: none;
-    }
-
-    .panel {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--soft);
-      overflow: hidden;
-    }
-
-    .panel-header {
-      border-bottom: 1px solid var(--line);
-      color: var(--muted);
-      font-size: 13px;
-      padding: 12px 16px;
-    }
-
-    pre {
-      margin: 0;
-      overflow-x: auto;
-      padding: 18px;
-      background: #0f172a;
-      color: #e2e8f0;
-      font-size: 14px;
-      line-height: 1.7;
-      tab-size: 2;
-    }
-
     code {
-      border-radius: 5px;
-      background: var(--code);
-      color: var(--ink);
+      border-radius: 0;
+      background: #f1f5f9;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-      font-size: 0.92em;
-      padding: 0.13em 0.34em;
+      font-size: 0.875rem;
+      padding: 0.1rem 0.25rem;
     }
-
-    pre code {
+    .code-block {
+      margin-top: 3rem;
+      overflow-x: auto;
+      background: #f1f5f9;
+      padding: 1rem;
+      text-align: left;
+    }
+    .code-block code {
+      display: block;
+      min-width: max-content;
       background: transparent;
-      color: inherit;
       padding: 0;
+      white-space: pre;
     }
-
-    main {
-      display: grid;
-      gap: 54px;
-      padding-top: 54px;
+    .callout {
+      margin-top: 3rem;
+      background: #f1f5f9;
+      padding: 1rem;
+      text-align: center;
     }
-
-    section {
-      display: grid;
-      grid-template-columns: 280px minmax(0, 1fr);
-      gap: 40px;
-      align-items: start;
-    }
-
-    h2 {
-      margin: 0;
-      font-size: 22px;
-      line-height: 1.25;
-      letter-spacing: 0;
-    }
-
-    .content > *:first-child {
-      margin-top: 0;
-    }
-
-    .content > *:last-child {
-      margin-bottom: 0;
-    }
-
-    p {
-      color: var(--muted);
-      margin: 16px 0;
-    }
-
-    ul {
-      color: var(--muted);
-      margin: 16px 0 0;
-      padding-left: 22px;
-    }
-
-    li + li {
-      margin-top: 8px;
-    }
-
     footer {
-      border-top: 1px solid var(--line);
-      color: var(--muted);
-      margin-top: 60px;
-      padding-top: 28px;
-      font-size: 14px;
+      border-top: 1px solid #e2e8f0;
+      color: #475569;
+      padding: 2rem;
+      font-size: 0.875rem;
     }
-
-    @media (max-width: 820px) {
-      .page {
-        padding: 22px 18px 52px;
-      }
-
-      header,
-      .hero,
-      section {
-        display: block;
-      }
-
-      nav {
-        margin-top: 14px;
-      }
-
-      .hero {
-        padding-bottom: 42px;
-      }
-
-      .panel {
-        margin-top: 30px;
-      }
-
-      section {
-        padding-top: 8px;
-      }
-
-      section + section {
-        border-top: 1px solid var(--line);
-        padding-top: 34px;
-      }
-
-      h1 {
-        font-size: 52px;
-      }
-
-      .lead {
-        font-size: 18px;
-      }
-
-      .content {
-        margin-top: 16px;
-      }
+    @media (max-width: 640px) {
+      header { padding-top: 5rem; }
+      h1 { font-size: 3.5rem; }
+      main { padding-top: 3rem; }
     }
   </style>
 </head>
 <body>
-  <div class="page">
-    <header>
-      <a class="brand" href="${esmOrigin}/">UNPKG <span>ESM</span></a>
-      <nav>
-        <a href="${wwwOrigin}/">UNPKG home</a>
-        <a href="${wwwOrigin}/#browser-modules">Docs</a>
-        <a href="${esmOrigin}/react@18.3.1?target=es2022">Example module</a>
-      </nav>
-    </header>
+  <header>
+    <h1>UNPKG ESM</h1>
+  </header>
 
-    <div class="hero">
-      <div>
-        <div class="eyebrow">Beta service</div>
-        <h1>Browser-ready modules from npm.</h1>
-        <p class="lead">
-          esm.unpkg.com resolves npm packages, bundles package internals when needed, rewrites dependency imports to
-          stable UNPKG URLs, and returns JavaScript that modern browsers can import directly.
+  <main>
+    <div class="content">
+      <section>
+        <p>
+          <strong>esm.unpkg.com is currently in beta.</strong> It serves browser-ready ES modules from npm packages using
+          UNPKG infrastructure. Use it when a package is not already published as browser-ready ESM and you want to load
+          it directly in modern browsers without a build step.
         </p>
-        <div class="actions">
-          <a class="button primary" href="${wwwOrigin}/#browser-modules">Read the official docs</a>
-          <a class="button" href="${esmOrigin}/react@18.3.1?meta">View module metadata</a>
-        </div>
-      </div>
 
-      <div class="panel">
-        <div class="panel-header">Import React without a build step</div>
-        <pre><code>&lt;script type="module"&gt;
+        <p class="callout">
+          <code>${esmOrigin}/:package@:version/:subpath</code>
+        </p>
+      </section>
+
+      <section>
+        <h2>Example</h2>
+        <p>Import packages from <code>esm.unpkg.com</code> in a module script:</p>
+
+        <div class="code-block"><code>&lt;script type="module"&gt;
   import React from "${esmOrigin}/react@18.3.1";
   import { createRoot } from "${esmOrigin}/react-dom@18.3.1/client";
 
   createRoot(document.getElementById("root")).render(
     React.createElement("h1", null, "Hello from esm.unpkg.com")
   );
-&lt;/script&gt;</code></pre>
-      </div>
+&lt;/script&gt;</code></div>
+      </section>
+
+      <section>
+        <h2>Usage</h2>
+        <ul>
+          <li>Omit the version to use the package's <code>latest</code> npm tag.</li>
+          <li>Use npm dist-tags, semver ranges, or exact versions in the URL.</li>
+          <li>Add <code>?target=es2022</code> to choose an output target.</li>
+          <li>Add <code>?dev</code> for development builds.</li>
+          <li>Add <code>?bundle</code>, <code>?standalone</code>, or <code>?no-bundle</code> to control bundling.</li>
+          <li>Add <code>?meta</code> to inspect resolved module metadata.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Documentation</h2>
+        <p>
+          For official UNPKG documentation, including package URLs, exports, metadata, import maps, and browser module
+          options, visit the <a href="${wwwOrigin}/">main UNPKG home page</a>. The browser modules section is available
+          at <a href="${wwwOrigin}/#browser-modules">${wwwOrigin}/#browser-modules</a>.
+        </p>
+      </section>
     </div>
+  </main>
 
-    <main>
-      <section>
-        <h2>URL format</h2>
-        <div class="content">
-          <p>
-            Use the same package URL shape as UNPKG, but on the ESM subdomain:
-          </p>
-          <div class="panel">
-            <pre><code>${esmOrigin}/:package@:version/:subpath</code></pre>
-          </div>
-          <p>
-            Versions may be exact versions, npm dist-tags, or semver ranges. Requests normalize to version-pinned URLs
-            whenever possible so generated imports are stable and cacheable.
-          </p>
-        </div>
-      </section>
-
-      <section>
-        <h2>Common options</h2>
-        <div class="content">
-          <ul>
-            <li><code>?target=es2022</code> selects the JavaScript output target.</li>
-            <li><code>?dev</code> or <code>?env=development</code> builds development output.</li>
-            <li><code>?bundle</code>, <code>?standalone</code>, and <code>?no-bundle</code> control bundling.</li>
-            <li><code>?deps=react@18.3.1</code> overrides dependency versions.</li>
-            <li><code>?alias=react:preact/compat</code> rewrites package imports.</li>
-            <li><code>?external=react</code> leaves matching dependencies as bare imports.</li>
-            <li><code>?meta</code> returns JSON metadata for the resolved module.</li>
-            <li><code>?raw</code> serves the raw package file without transforming it.</li>
-          </ul>
-        </div>
-      </section>
-
-      <section>
-        <h2>Beta status</h2>
-        <div class="content">
-          <p>
-            This service is currently in beta. It is designed for esm.sh-style browser imports on top of UNPKG, and the
-            supported behavior will continue to tighten as compatibility testing expands across the npm ecosystem.
-          </p>
-          <p>
-            For the canonical UNPKG documentation, including package URLs, metadata, exports, import maps, and the full
-            browser modules guide, visit the <a href="${wwwOrigin}/">main UNPKG home page</a>.
-          </p>
-        </div>
-      </section>
-    </main>
-
-    <footer>
-      ESM service for UNPKG. Packages are resolved from npm and served from UNPKG infrastructure.
-    </footer>
-  </div>
+  <footer>
+    Packages are resolved from npm and served by UNPKG.
+  </footer>
 </body>
 </html>`;
 }

@@ -114,8 +114,8 @@ describe("handleRequest", () => {
     expect(response.headers.get("Content-Type")).toMatch(/^text\/html/);
 
     let html = await response.text();
-    expect(html).toContain("Browser-ready modules from npm.");
-    expect(html).toContain("Beta service");
+    expect(html).toContain("UNPKG ESM");
+    expect(html).toContain("esm.unpkg.com is currently in beta.");
     expect(html).toContain("https://unpkg.com/#browser-modules");
     expect(html).toContain("https://esm.unpkg.com/react@18.3.1");
   });
