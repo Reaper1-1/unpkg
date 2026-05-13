@@ -338,6 +338,8 @@ describe("bundleSource", () => {
 
       expect(result.code).not.toContain('Dynamic require of "self-referencing-package"');
       expect(result.code).toContain("createRoot");
+      expect(result.code).toContain("export { __unpkg_cjs_default as default };");
+      expect(result.code).toContain("export const createRoot = __unpkg_cjs_default.createRoot;");
     } finally {
       await rm(packageDirectory, { force: true, recursive: true });
     }

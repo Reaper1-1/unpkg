@@ -392,7 +392,7 @@ export async function bundleSource(
   }
 
   return {
-    code: output.text,
+    code: addCommonJsNamedExports(output.text, collectCommonJsExportNames(code)),
   };
 }
 
@@ -574,7 +574,11 @@ function addCommonJsNamedExports(code: string, exportNames: string[]): string {
     return code;
   }
 
-  let match = /export default (require_[\w$]+\(\));\s*$/.exec(code);
+  let match: RegExpExecArray | null = null;
+  for (let candidate of code.matchAll(/export default (require_[\w$]+\(\));/g)) {
+    match = candidate;
+  }
+
   if (match == null) {
     return code;
   }

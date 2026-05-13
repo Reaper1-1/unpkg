@@ -50,7 +50,7 @@ For browser execution smoke checks, run:
 pnpm test:esm-browser -- --corpus scripts/esm-compat-corpus.seed.json --origin https://esm.sh
 ```
 
-The browser smoke runner imports selected module scenarios in Chromium and records evaluation success, export names, request count, transferred bytes, and duration. Use `ESM_BROWSER_ORIGIN` or `--origin` to point it at a beta `esm.unpkg.com` deployment.
+The browser smoke runner imports selected module scenarios in Chromium and records evaluation success, export names, request count, transferred bytes, and duration. It also runs focused runtime assertions for the most important browser workflows: React rendering through `react-dom/client`, Preact rendering, CommonJS subpath execution, browser-native package APIs, import-map externalization, and constructable CSS stylesheet modules. Use `ESM_BROWSER_ORIGIN` or `--origin` to point it at a beta `esm.unpkg.com` deployment.
 
 To evaluate beta readiness from saved JSON reports:
 

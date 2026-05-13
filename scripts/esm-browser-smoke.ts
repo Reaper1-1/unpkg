@@ -6,10 +6,15 @@ import { chromium } from "playwright";
 interface CompatCase {
   category?: string;
   description: string;
-  expect: "module" | "json" | "diagnostic";
+  expect: "module" | "json" | "css" | "diagnostic";
   features?: string[];
   package?: string;
   path: string;
+}
+
+interface RuntimeSmokeCase {
+  case: CompatCase;
+  run: (page: import("playwright").Page, origin: string) => Promise<string[]>;
 }
 
 interface CompatCorpus {
@@ -45,38 +50,56 @@ let corpus = await loadCorpus(options.corpusPath);
 let smokeCases = corpus.cases.filter((compatCase) => {
   if (compatCase.expect !== "module") return false;
   if (compatCase.features?.includes("worker")) return false;
+  if (compatCase.features?.includes("external")) return false;
+  if (compatCase.features?.includes("external-all")) return false;
   if (compatCase.features?.includes("target-node")) return false;
   return options.packageName == null || compatCase.package === options.packageName;
 }).slice(0, options.limit);
+let runtimeCases = options.packageName == null ? createRuntimeSmokeCases() : [];
 
 if (options.dryRun) {
+  let importResults = smokeCases.map((compatCase) => ({
+    case: compatCase,
+    durationMs: 0,
+    error: null,
+    exportKeys: [],
+    requestCount: 0,
+    transferredBytes: 0,
+    url: new URL(compatCase.path, origin).toString(),
+  }));
+  let runtimeResults = runtimeCases.map(({ case: smokeCase }) => ({
+    case: smokeCase,
+    durationMs: 0,
+    error: null,
+    exportKeys: [],
+    requestCount: 0,
+    transferredBytes: 0,
+    url: new URL(smokeCase.path, origin).toString(),
+  }));
+  let results = [...importResults, ...runtimeResults];
   printReport({
     browser: "chromium",
     corpus: corpus.name ?? options.corpusPath,
     createdAt: new Date().toISOString(),
     failed: 0,
     origin,
-    passed: smokeCases.length,
-    results: smokeCases.map((compatCase) => ({
-      case: compatCase,
-      durationMs: 0,
-      error: null,
-      exportKeys: [],
-      requestCount: 0,
-      transferredBytes: 0,
-      url: new URL(compatCase.path, origin).toString(),
-    })),
-    total: smokeCases.length,
+    passed: results.length,
+    results,
+    total: results.length,
   }, options.jsonOutput);
   process.exit(0);
 }
 
 let browser = await chromium.launch();
 try {
-  let page = await browser.newPage();
+  let context = await browser.newContext();
+  let page = await context.newPage();
   let results: BrowserSmokeResult[] = [];
   for (let compatCase of smokeCases) {
     results.push(await runCase(page, compatCase, origin));
+  }
+  for (let runtimeCase of runtimeCases) {
+    results.push(await runRuntimeCase(page, runtimeCase, origin));
   }
 
   let failed = results.filter((result) => result.error != null).length;
@@ -100,6 +123,36 @@ try {
 
 async function runCase(page: import("playwright").Page, compatCase: CompatCase, origin: string): Promise<BrowserSmokeResult> {
   let url = new URL(compatCase.path, origin).toString();
+  return trackBrowserCase(page, compatCase, origin, url, async () => {
+    return page.evaluate(async (moduleUrl) => {
+      let module = await import(moduleUrl);
+      return Object.keys(module).sort();
+    }, url);
+  });
+}
+
+async function runRuntimeCase(
+  page: import("playwright").Page,
+  runtimeCase: RuntimeSmokeCase,
+  origin: string
+): Promise<BrowserSmokeResult> {
+  let url = new URL(runtimeCase.case.path, origin).toString();
+  let runtimePage = await page.context().newPage();
+  try {
+    await runtimePage.setContent("<!doctype html><html><body></body></html>");
+    return await trackBrowserCase(runtimePage, runtimeCase.case, origin, url, () => runtimeCase.run(runtimePage, origin));
+  } finally {
+    await runtimePage.close();
+  }
+}
+
+async function trackBrowserCase(
+  page: import("playwright").Page,
+  compatCase: CompatCase,
+  origin: string,
+  url: string,
+  callback: () => Promise<string[]>
+): Promise<BrowserSmokeResult> {
   let startedAt = performance.now();
   let requestCount = 0;
   let transferredBytes = 0;
@@ -122,10 +175,7 @@ async function runCase(page: import("playwright").Page, compatCase: CompatCase, 
 
   page.on("response", responseHandler);
   try {
-    let exportKeys = await page.evaluate(async (moduleUrl) => {
-      let module = await import(moduleUrl);
-      return Object.keys(module).sort();
-    }, url);
+    let exportKeys = await callback();
 
     return {
       case: compatCase,
@@ -149,6 +199,146 @@ async function runCase(page: import("playwright").Page, compatCase: CompatCase, 
   } finally {
     page.off("response", responseHandler);
   }
+}
+
+function createRuntimeSmokeCases(): RuntimeSmokeCase[] {
+  return [
+    {
+      case: {
+        category: "runtime",
+        description: "React renders with react-dom/client",
+        expect: "module",
+        features: ["runtime", "react", "render"],
+        package: "react-dom",
+        path: "/__runtime/react-render",
+      },
+      run: (page, origin) =>
+        page.evaluate(async (esmOrigin) => {
+          let ReactModule = await import(`${esmOrigin}/react@18.3.1`);
+          let React = ReactModule.default ?? ReactModule;
+          let ReactDOM = await import(`${esmOrigin}/react-dom@18.3.1/client`);
+          let container = document.createElement("div");
+          document.body.append(container);
+          let root = ReactDOM.createRoot(container);
+          root.render(React.createElement("button", { type: "button" }, "Hello React"));
+          await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+          if (container.textContent !== "Hello React") {
+            throw new Error(`React render failed: ${container.textContent ?? ""}`);
+          }
+          root.unmount();
+          return ["createRoot", "render"];
+        }, origin),
+    },
+    {
+      case: {
+        category: "runtime",
+        description: "Preact renders DOM in Chromium",
+        expect: "module",
+        features: ["runtime", "preact", "render"],
+        package: "preact",
+        path: "/__runtime/preact-render",
+      },
+      run: (page, origin) =>
+        page.evaluate(async (esmOrigin) => {
+          let { h, render } = await import(`${esmOrigin}/preact@10.26.4`);
+          let container = document.createElement("div");
+          document.body.append(container);
+          render(h("button", { type: "button" }, "Hello Preact"), container);
+          await new Promise((resolve) => requestAnimationFrame(resolve));
+          if (container.textContent !== "Hello Preact") {
+            throw new Error(`Preact render failed: ${container.textContent ?? ""}`);
+          }
+          render(null, container);
+          return ["h", "render"];
+        }, origin),
+    },
+    {
+      case: {
+        category: "runtime",
+        description: "CommonJS lodash subpath executes in the browser",
+        expect: "module",
+        features: ["runtime", "cjs"],
+        package: "lodash",
+        path: "/__runtime/lodash-cjs",
+      },
+      run: (page, origin) =>
+        page.evaluate(async (esmOrigin) => {
+          let module = await import(`${esmOrigin}/lodash@4.17.21/map`);
+          let map = module.default;
+          let result = map([1, 2, 3], (value) => value * 2);
+          if (result.join(",") !== "2,4,6") {
+            throw new Error(`Unexpected lodash result: ${result.join(",")}`);
+          }
+          return ["default", "map"];
+        }, origin),
+    },
+    {
+      case: {
+        category: "runtime",
+        description: "Browser package API executes in Chromium",
+        expect: "module",
+        features: ["runtime", "browser"],
+        package: "uuid",
+        path: "/__runtime/uuid-browser",
+      },
+      run: (page, origin) =>
+        page.evaluate(async (esmOrigin) => {
+          let { validate, v4 } = await import(`${esmOrigin}/uuid@14.0.0`);
+          let id = v4();
+          if (!validate(id)) {
+            throw new Error(`Invalid UUID generated: ${id}`);
+          }
+          return ["v4", "validate"];
+        }, origin),
+    },
+    {
+      case: {
+        category: "runtime",
+        description: "Import-map externalization resolves bare imports",
+        expect: "module",
+        features: ["runtime", "external", "import-map"],
+        package: "react-dom",
+        path: "/__runtime/import-map-external",
+      },
+      run: async (page, origin) => {
+        await page.setContent(`<!doctype html><html><head><script type="importmap">${JSON.stringify({
+          imports: {
+            react: `${origin}/react@18.3.1`,
+          },
+        })}</script></head><body></body></html>`);
+
+        return page.evaluate(async (moduleUrl) => {
+          let ReactDOM = await import(moduleUrl);
+          if (typeof ReactDOM.createRoot !== "function") {
+            throw new Error("Externalized react-dom/client did not expose createRoot");
+          }
+          return ["createRoot", "importmap"];
+        }, `${origin}/react-dom@18.3.1/client?external=react`);
+      },
+    },
+    {
+      case: {
+        category: "runtime",
+        description: "CSS module exports a constructable stylesheet",
+        expect: "module",
+        features: ["runtime", "css", "css-module"],
+        package: "react-toastify",
+        path: "/__runtime/css-module",
+      },
+      run: (page, origin) =>
+        page.evaluate(async (esmOrigin) => {
+          let module = await import(`${esmOrigin}/react-toastify@11.0.5/dist/ReactToastify.css?module`);
+          if (!(module.default instanceof CSSStyleSheet)) {
+            throw new Error("CSS module did not export a CSSStyleSheet");
+          }
+          document.adoptedStyleSheets = [...document.adoptedStyleSheets, module.default];
+          if (!document.adoptedStyleSheets.includes(module.default)) {
+            throw new Error("CSSStyleSheet was not adopted by the document");
+          }
+          return ["CSSStyleSheet", "adoptedStyleSheets"];
+        }, origin),
+    },
+  ];
 }
 
 async function loadCorpus(corpusPath: string): Promise<CompatCorpus> {

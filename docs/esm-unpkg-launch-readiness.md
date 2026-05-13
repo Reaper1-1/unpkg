@@ -49,7 +49,7 @@ This PR now includes the machinery needed to gather launch evidence:
 
 - A richer compatibility runner with corpus support and JSON output.
 - A generated 101-package, 375-scenario ecosystem corpus.
-- A Chromium browser smoke runner.
+- A Chromium browser smoke runner that verifies imports plus representative runtime behavior for React, Preact, CommonJS, browser APIs, import maps, and CSS modules.
 - Resolver, CJS, dependency graph, builtin, and type metadata improvements with targeted tests.
 - A readiness gate script that summarizes pass rates, duration, artifact size, and failure classification.
 

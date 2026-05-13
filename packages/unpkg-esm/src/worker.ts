@@ -7,12 +7,13 @@ const cache = caches.default as Cache;
 export default {
   async fetch(request, env, context) {
     try {
-      let response = await cache.match(request);
+      let shouldUseCache = env.MODE !== "development" && env.MODE !== "test";
+      let response = shouldUseCache ? await cache.match(request) : undefined;
 
       if (!response) {
         response = await handleRequest(request, env, context);
 
-        if (request.method === "GET" && response.status === 200 && response.headers.has("Cache-Control")) {
+        if (shouldUseCache && request.method === "GET" && response.status === 200 && response.headers.has("Cache-Control")) {
           context.waitUntil(cache.put(request, response.clone()));
         }
       }
