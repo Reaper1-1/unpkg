@@ -165,6 +165,14 @@ describe("rewriteEsmImports", () => {
     expect(result).toBe('import process from "https://esm.unpkg.com/@jspm/core@2/nodelibs/browser/process";');
   });
 
+  it("rewrites additional browser-compatible Node builtins to polyfills", async () => {
+    let code = 'import crypto from "node:crypto";\nimport os from "os";';
+    let result = await rewriteEsmImports(code, registry, "https://esm.unpkg.com", {}, options());
+
+    expect(result).toContain('from "https://esm.unpkg.com/@jspm/core@2/nodelibs/browser/crypto"');
+    expect(result).toContain('from "https://esm.unpkg.com/@jspm/core@2/nodelibs/browser/os"');
+  });
+
   it("rejects hard Node-only builtins", async () => {
     let code = 'import fs from "node:fs";';
 
@@ -173,8 +181,16 @@ describe("rewriteEsmImports", () => {
     );
   });
 
+  it("rejects additional hard Node-only builtins", async () => {
+    let code = 'import workerThreads from "node:worker_threads";';
+
+    await expect(rewriteEsmImports(code, registry, "https://esm.unpkg.com", {}, options())).rejects.toBeInstanceOf(
+      UnsupportedNodeBuiltinError
+    );
+  });
+
   it("preserves Node builtins for runtime-native targets", async () => {
-    let code = 'import fs from "node:fs";\nimport process from "node:process";';
+    let code = 'import fs from "node:fs";\nimport crypto from "node:crypto";\nimport process from "node:process";';
     let result = await rewriteEsmImports(code, registry, "https://esm.unpkg.com", {}, options("target=node"));
 
     expect(result).toBe(code);
