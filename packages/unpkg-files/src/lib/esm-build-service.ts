@@ -105,6 +105,16 @@ export class UnsupportedSourceTypeError extends Error {
   }
 }
 
+export class UnsupportedDynamicRequireError extends Error {
+  filename: string;
+
+  constructor(filename: string) {
+    super(`Dynamic require is not supported in browser ESM builds: ${filename}`);
+    this.name = "UnsupportedDynamicRequireError";
+    this.filename = filename;
+  }
+}
+
 export async function buildEsmModule(registry: string, request: BuildRequest): Promise<BuildResult | null> {
   let packageJsonFile = await getFile(registry, request.packageName, request.version, "/package.json");
   if (packageJsonFile == null) {
@@ -408,6 +418,10 @@ export async function transformSource(
   filename: string,
   options: NormalizedBuildOptions
 ): Promise<{ code: string; map?: string }> {
+  if (hasDynamicRequire(code)) {
+    throw new UnsupportedDynamicRequireError(filename);
+  }
+
   let result = await esbuild.transform(code, {
     define: {
       "process.env.NODE_ENV": JSON.stringify(options.env),
@@ -427,7 +441,7 @@ export async function transformSource(
   });
 
   return {
-    code: result.code,
+    code: addCommonJsNamedExports(result.code, collectCommonJsExportNames(code)),
     map: result.map,
   };
 }
@@ -438,6 +452,33 @@ function getEsbuildLoader(filename: string): esbuild.Loader {
   if (filename.endsWith(".jsx")) return "jsx";
   if (filename.endsWith(".json")) return "json";
   return "js";
+}
+
+function hasDynamicRequire(code: string): boolean {
+  return /\brequire\s*\(\s*[^"'`\s)]/.test(code);
+}
+
+function collectCommonJsExportNames(code: string): string[] {
+  let names = new Set<string>();
+  for (let match of code.matchAll(/\b(?:exports|module\.exports)\.([A-Za-z_$][\w$]*)\s*=/g)) {
+    names.add(match[1]);
+  }
+
+  return Array.from(names).sort();
+}
+
+function addCommonJsNamedExports(code: string, exportNames: string[]): string {
+  if (exportNames.length === 0) {
+    return code;
+  }
+
+  let match = /export default (require_[\w$]+\(\));\s*$/.exec(code);
+  if (match == null) {
+    return code;
+  }
+
+  let namedExports = exportNames.map((name) => `export const ${name} = __unpkg_cjs_default.${name};`).join("\n");
+  return code.slice(0, match.index) + `var __unpkg_cjs_default = ${match[1]};\nexport { __unpkg_cjs_default as default };\n${namedExports}\n`;
 }
 
 function createPackageInternalBundlePlugin(

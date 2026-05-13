@@ -6,6 +6,7 @@ import {
   buildEsmModule,
   normalizeBuildOptions,
   transformInlineEsmModule,
+  UnsupportedDynamicRequireError,
   UnsupportedNodeBuiltinError,
   UnsupportedSourceTypeError,
 } from "./esm-build-service.ts";
@@ -195,6 +196,11 @@ async function handleRequest_(request: Request): Promise<Response> {
     if (error instanceof UnsupportedSourceTypeError) {
       return new Response(error.message, {
         status: 415,
+      });
+    }
+    if (error instanceof UnsupportedDynamicRequireError) {
+      return new Response(error.message, {
+        status: 422,
       });
     }
 

@@ -7,6 +7,7 @@ import {
   resolveBuildFilename,
   rewriteEsmImports,
   transformSource,
+  UnsupportedDynamicRequireError,
   UnsupportedNodeBuiltinError,
 } from "./esm-build-service.ts";
 
@@ -157,6 +158,34 @@ describe("rewriteEsmImports", () => {
 });
 
 describe("transformSource", () => {
+  it("transforms CommonJS default exports", async () => {
+    let result = await transformSource(
+      "module.exports = function value() { return 1; };",
+      "/src/index.cjs",
+      options()
+    );
+
+    expect(result.code).toContain("export default");
+    expect(result.code).toContain("__commonJS");
+  });
+
+  it("adds named exports for simple CommonJS export assignments", async () => {
+    let result = await transformSource(
+      "exports.answer = 42;",
+      "/src/index.cjs",
+      options()
+    );
+
+    expect(result.code).toContain("export { __unpkg_cjs_default as default };");
+    expect(result.code).toContain("export const answer = __unpkg_cjs_default.answer;");
+  });
+
+  it("rejects dynamic require with a clear diagnostic", async () => {
+    await expect(transformSource("require(name);", "/src/index.cjs", options())).rejects.toBeInstanceOf(
+      UnsupportedDynamicRequireError
+    );
+  });
+
   it("transforms TypeScript and replaces NODE_ENV", async () => {
     let result = await transformSource(
       "export const mode: string = process.env.NODE_ENV;",
