@@ -6,6 +6,7 @@ import {
   parseDependencyOverrides,
   rewriteEsmImports,
   transformSource,
+  UnsupportedNodeBuiltinError,
 } from "./esm-build-service.ts";
 
 const registry = "https://registry.npmjs.org";
@@ -94,6 +95,21 @@ describe("rewriteEsmImports", () => {
     let result = await rewriteEsmImports(code, registry, "https://esm.unpkg.com", {}, options());
 
     expect(result).toBe('import util from "./util?target=es2022";');
+  });
+
+  it("rewrites common Node builtins to browser polyfills", async () => {
+    let code = 'import process from "node:process";';
+    let result = await rewriteEsmImports(code, registry, "https://esm.unpkg.com", {}, options());
+
+    expect(result).toBe('import process from "https://esm.unpkg.com/@jspm/core@2/nodelibs/browser/process";');
+  });
+
+  it("rejects hard Node-only builtins", async () => {
+    let code = 'import fs from "node:fs";';
+
+    await expect(rewriteEsmImports(code, registry, "https://esm.unpkg.com", {}, options())).rejects.toBeInstanceOf(
+      UnsupportedNodeBuiltinError
+    );
   });
 });
 

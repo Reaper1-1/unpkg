@@ -414,6 +414,20 @@ describe("handleRequest", () => {
       expect(response.headers.get("Content-Type")).toMatch(/^application\/json/);
       expect(await response.text()).toMatch(/"name": "react"/);
     });
+
+    it("returns module worker wrappers", async () => {
+      let redirectResponse = await dispatchFetch("https://esm.unpkg.com/preact@10.26.4/src/component.js?worker", {
+        redirect: "manual",
+      });
+      expect(redirectResponse.status).toBe(301);
+
+      let response = await dispatchFetch(`https://esm.unpkg.com${redirectResponse.headers.get("Location")}`);
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Content-Type")).toBe("application/javascript; charset=utf-8");
+      expect(await response.text()).toContain(
+        'return new Worker("https://esm.unpkg.com/preact@10.26.4/src/component.js?target=es2022", { type: "module", ...options });'
+      );
+    });
   });
 
   describe("/browse/* requests", () => {

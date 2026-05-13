@@ -12,6 +12,23 @@ import type { PackageInfo } from "unpkg-worker";
 import { getFile } from "./npm-files.ts";
 
 const defaultEsmOrigin = "https://esm.unpkg.com";
+const hardNodeBuiltins = new Set(["fs", "node:fs", "net", "node:net", "tls", "node:tls", "child_process", "node:child_process"]);
+const browserBuiltinPolyfills: Record<string, string> = {
+  "node:buffer": "@jspm/core@2/nodelibs/browser/buffer",
+  "node:events": "@jspm/core@2/nodelibs/browser/events",
+  "node:path": "@jspm/core@2/nodelibs/browser/path",
+  "node:process": "@jspm/core@2/nodelibs/browser/process",
+  "node:stream": "@jspm/core@2/nodelibs/browser/stream",
+  "node:url": "@jspm/core@2/nodelibs/browser/url",
+  "node:util": "@jspm/core@2/nodelibs/browser/util",
+  buffer: "@jspm/core@2/nodelibs/browser/buffer",
+  events: "@jspm/core@2/nodelibs/browser/events",
+  path: "@jspm/core@2/nodelibs/browser/path",
+  process: "@jspm/core@2/nodelibs/browser/process",
+  stream: "@jspm/core@2/nodelibs/browser/stream",
+  url: "@jspm/core@2/nodelibs/browser/url",
+  util: "@jspm/core@2/nodelibs/browser/util",
+};
 
 export interface BuildRequest {
   packageName: string;
@@ -59,6 +76,16 @@ interface PackageJson {
   name?: string;
   peerDependencies?: Record<string, string>;
   version?: string;
+}
+
+export class UnsupportedNodeBuiltinError extends Error {
+  builtin: string;
+
+  constructor(builtin: string) {
+    super(`Node builtin is not available in browser builds: ${builtin}`);
+    this.name = "UnsupportedNodeBuiltinError";
+    this.builtin = builtin;
+  }
 }
 
 export async function buildEsmModule(registry: string, request: BuildRequest): Promise<BuildResult | null> {
@@ -430,6 +457,13 @@ async function rewriteEsmSpecifier(
   dependencies: Record<string, string>,
   options: NormalizedBuildOptions
 ): Promise<string> {
+  if (hardNodeBuiltins.has(specifier)) {
+    throw new UnsupportedNodeBuiltinError(specifier);
+  }
+  if (specifier in browserBuiltinPolyfills) {
+    return `${origin}/${browserBuiltinPolyfills[specifier]}`;
+  }
+
   if (specifier === "" || isValidUrl(specifier)) {
     return specifier;
   }

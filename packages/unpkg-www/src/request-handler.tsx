@@ -339,6 +339,20 @@ async function handleEsmRequest(request: Request, env: Env, context: ExecutionCo
     });
   }
 
+  if (searchParams.has("worker")) {
+    let workerSearchParams = new URLSearchParams(searchParams);
+    workerSearchParams.delete("worker");
+    let workerUrl = new URL(`/${packageName}@${version}${packagePath.filename ?? ""}${normalizeEsmSearch(workerSearchParams)}`, normalized.url.origin);
+    let code = `export default function createWorker(options) {\n  return new Worker(${JSON.stringify(workerUrl.toString())}, { type: "module", ...options });\n}\n`;
+
+    return new Response(code, {
+      headers: esmCorsHeaders({
+        "Cache-Control": "public, max-age=31536000, immutable",
+        "Content-Type": "application/javascript; charset=utf-8",
+      }),
+    });
+  }
+
   if (searchParams.has("raw")) {
     let rawResponse = await fetch(new URL(`/file/${packageName}@${version}${packagePath.filename ?? "/package.json"}`, env.FILES_ORIGIN));
     if (!rawResponse.ok) {
