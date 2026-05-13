@@ -12,12 +12,13 @@ This repository powers UNPKG, a CDN and web app for serving npm package files di
 - `packages/unpkg-worker` contains shared Cloudflare Worker utilities used by the worker packages.
 - `scripts` contains repo-level maintenance and compatibility runners, including the ESM compatibility, browser smoke, readiness, and corpus generation tools.
 - `docs` contains product and implementation specs for larger efforts.
-- `vendor/esm.sh` is a pinned local copy of upstream esm.sh used as the compatibility baseline for corpus testing.
+- `pnpm vendor:esm-sh` starts a pinned upstream esm.sh Docker image for local baseline corpus testing.
 
 ## Runtime And Tooling
 
 - Node.js is used for tooling. The repo requires Node `>=23`.
 - Bun is used for runtime and tests. The `unpkg-files` server runs on Bun, and package tests use `bun test`.
+- Docker is used to run the pinned local esm.sh baseline for compatibility tests.
 - Use pnpm for workspace commands and dependency management.
 - Do not assume Node and Bun are interchangeable here: prefer the command already declared in `package.json` scripts.
 

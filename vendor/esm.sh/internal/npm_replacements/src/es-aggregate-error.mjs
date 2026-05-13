@@ -1,2 +1,0 @@
-// AggregateError
-export default AggregateError;

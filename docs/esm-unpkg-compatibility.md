@@ -10,12 +10,14 @@ Run the representative compatibility suite with:
 pnpm test:esm-compat
 ```
 
-By default the runner compares `https://esm.sh` with `https://esm.unpkg.com`. For repeatable corpus runs, prefer the pinned local esm.sh baseline vendored in `vendor/esm.sh` instead of production `https://esm.sh`:
+By default the runner compares `https://esm.sh` with `https://esm.unpkg.com`. For repeatable corpus runs, prefer the pinned local esm.sh Docker baseline instead of production `https://esm.sh`:
 
 ```sh
 pnpm vendor:esm-sh
 pnpm test:esm-compat:local-baseline -- --corpus scripts/esm-compat-corpus.ecosystem.json
 ```
+
+`pnpm vendor:esm-sh` runs `ghcr.io/esm-dev/esm.sh:v137_3` pinned by digest on `http://localhost:8081`. It stores generated baseline artifacts under `.reports/esm-sh-baseline`, which can be cleared with `pnpm clean:reports`.
 
 For beta or local `esm.unpkg.com` validation, override origins:
 

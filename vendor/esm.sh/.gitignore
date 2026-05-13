@@ -1,7 +1,0 @@
-.DS_Store
-.idea/
-.vscode/
-config.json
-esmd
-.esmd/
-!server/esmd
