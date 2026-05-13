@@ -33,6 +33,7 @@ export interface PackageJson {
   peerDependencies?: Record<string, string>;
   repository?: { url: string; type?: string; directory?: string };
   types?: string;
+  typesVersions?: Record<string, Record<string, string[]>>;
   typings?: string;
   unpkg?: string;
   version: string;

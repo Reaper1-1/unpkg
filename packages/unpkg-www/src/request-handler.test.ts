@@ -4,7 +4,7 @@ import { handleRequest as handleFilesRequest } from "unpkg-files";
 
 import { packageInfo, packageTarballs } from "../test/fixtures.ts";
 import type { Env } from "./env.ts";
-import { handleRequest } from "./request-handler.tsx";
+import { handleRequest, resolveTypesPath } from "./request-handler.tsx";
 
 const env: Env = {
   APP_ORIGIN: "https://app.unpkg.com",
@@ -515,5 +515,50 @@ describe("handleRequest", () => {
       expect(location).not.toBeNull();
       expect(location).toBe("https://app.unpkg.com/react@18.2.0/files/cjs");
     });
+  });
+});
+
+describe("resolveTypesPath", () => {
+  it("resolves declaration paths from typesVersions", () => {
+    expect(
+      resolveTypesPath(
+        {
+          dependencies: {},
+          description: "",
+          name: "pkg",
+          typesVersions: {
+            "*": {
+              "subpath/*": ["types/subpath/*"],
+            },
+          },
+          version: "1.0.0",
+        },
+        "./subpath/index"
+      )
+    ).toBe("types/subpath/index");
+  });
+
+  it("prefers export-specific types over typesVersions", () => {
+    expect(
+      resolveTypesPath(
+        {
+          dependencies: {},
+          description: "",
+          exports: {
+            ".": {
+              types: "./exports.d.ts",
+            },
+          },
+          name: "pkg",
+          typesVersions: {
+            "*": {
+              "*": ["types/*"],
+            },
+          },
+          version: "1.0.0",
+        },
+        "."
+      )
+    ).toBe("./exports.d.ts");
   });
 });

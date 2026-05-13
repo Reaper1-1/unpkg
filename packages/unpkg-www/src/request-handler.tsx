@@ -506,7 +506,7 @@ function getPackageTypesUrl(
   return types == null ? null : new URL(`/${packageName}@${version}/${types.replace(/^\.?\/*/, "")}`, origin).toString();
 }
 
-function resolveTypesPath(packageJson: PackageJson, subpath: string): string | null {
+export function resolveTypesPath(packageJson: PackageJson, subpath: string): string | null {
   let exports = packageJson.exports;
   if (typeof exports === "object" && exports != null) {
     let exportValue = exports[subpath];
@@ -516,7 +516,50 @@ function resolveTypesPath(packageJson: PackageJson, subpath: string): string | n
     }
   }
 
+  let typesVersionsPath = resolveTypesVersionsPath(packageJson, subpath);
+  if (typesVersionsPath != null) {
+    return typesVersionsPath;
+  }
+
   return packageJson.types ?? packageJson.typings ?? null;
+}
+
+function resolveTypesVersionsPath(packageJson: PackageJson, subpath: string): string | null {
+  let typesVersions = packageJson.typesVersions;
+  if (typesVersions == null) {
+    return null;
+  }
+
+  let requestedPath = subpath === "." ? "" : subpath.replace(/^\.\//, "");
+  for (let mappings of Object.values(typesVersions)) {
+    let match = resolveTypesVersionMapping(mappings, requestedPath);
+    if (match != null) {
+      return match;
+    }
+  }
+
+  return null;
+}
+
+function resolveTypesVersionMapping(mappings: Record<string, string[]>, requestedPath: string): string | null {
+  let exact = mappings[requestedPath];
+  if (exact?.[0] != null) {
+    return exact[0];
+  }
+
+  for (let [pattern, targets] of Object.entries(mappings)) {
+    if (!pattern.includes("*") || targets[0] == null) {
+      continue;
+    }
+
+    let [prefix, suffix] = pattern.split("*", 2);
+    if (requestedPath.startsWith(prefix) && requestedPath.endsWith(suffix)) {
+      let matched = requestedPath.slice(prefix.length, requestedPath.length - suffix.length);
+      return targets[0].replace("*", matched);
+    }
+  }
+
+  return null;
 }
 
 function findTypesExport(value: unknown): string | null {
