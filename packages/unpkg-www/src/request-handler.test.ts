@@ -367,7 +367,7 @@ describe("handleRequest", () => {
     });
 
     it("proxies build artifacts from the files origin", async () => {
-      let redirectResponse = await dispatchFetch("https://esm.unpkg.com/preact@10.26.4/src/component.js", {
+      let redirectResponse = await dispatchFetch("https://esm.unpkg.com/preact@10.26.4/src/component.js?no-bundle", {
         redirect: "manual",
       });
       expect(redirectResponse.status).toBe(301);

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import path from "node:path";
 
 import * as esbuild from "esbuild";
 import { parse } from "es-module-lexer/js";
@@ -21,6 +22,7 @@ export interface BuildRequest {
 
 export interface NormalizedBuildOptions {
   aliases: Record<string, string>;
+  bundleMode: "smart" | "bundle" | "standalone" | "none";
   dependencyOverrides: Record<string, string>;
   env: "development" | "production";
   external: string[];
@@ -78,7 +80,10 @@ export async function buildEsmModule(registry: string, request: BuildRequest): P
 
   let code = new TextDecoder().decode(file.body);
   let deps = Object.assign({}, packageJson.peerDependencies, packageJson.dependencies);
-  let transformed = await transformSource(code, filename, request.options);
+  let transformed =
+    request.options.bundleMode === "none"
+      ? await transformSource(code, filename, request.options)
+      : await bundleSource(registry, request.packageName, request.version, filename, code, request.options);
   let rewritten = await rewriteEsmImports(transformed.code, registry, request.options.origin, deps, request.options);
   let buildKey = createBuildKey(request, filename);
   let metadata: BuildMetadata = {
@@ -106,6 +111,7 @@ export async function buildEsmModule(registry: string, request: BuildRequest): P
 export function normalizeBuildOptions(searchParams: URLSearchParams): NormalizedBuildOptions {
   return {
     aliases: parseAliases(searchParams.get("alias")),
+    bundleMode: parseBundleMode(searchParams),
     dependencyOverrides: parseDependencyOverrides(searchParams.get("deps")),
     env: searchParams.has("dev") || searchParams.get("env") === "development" ? "development" : "production",
     external: searchParams.get("external")?.split(",").filter(Boolean) ?? [],
@@ -160,6 +166,49 @@ export async function rewriteEsmImports(
   }
 
   return result;
+}
+
+export async function bundleSource(
+  registry: string,
+  packageName: string,
+  version: string,
+  filename: string,
+  code: string,
+  options: NormalizedBuildOptions
+): Promise<{ code: string; map?: string }> {
+  let result = await esbuild.build({
+    bundle: true,
+    define: {
+      "process.env.NODE_ENV": JSON.stringify(options.env),
+    },
+    format: "esm",
+    ignoreAnnotations: options.ignoreAnnotations,
+    jsx: options.jsx === "automatic" ? "automatic" : "transform",
+    jsxFactory: options.jsx === "preact" ? "h" : undefined,
+    jsxFragment: options.jsx === "preact" ? "Fragment" : undefined,
+    jsxImportSource: options.jsxImportSource,
+    keepNames: options.keepNames,
+    minify: options.minify,
+    plugins: [createPackageInternalBundlePlugin(registry, packageName, version)],
+    sourcemap: options.sourcemap ? "inline" : false,
+    stdin: {
+      contents: code,
+      loader: getEsbuildLoader(filename),
+      resolveDir: path.posix.dirname(filename),
+      sourcefile: filename,
+    },
+    target: options.target,
+    write: false,
+  });
+
+  let output = result.outputFiles[0];
+  if (output == null) {
+    throw new Error(`No bundled output generated for ${packageName}@${version}${filename}`);
+  }
+
+  return {
+    code: output.text,
+  };
 }
 
 export function parseDependencyOverrides(value: string | null): Record<string, string> {
@@ -227,6 +276,20 @@ function isJavaScriptContentType(contentType: string): boolean {
   return contentType === "text/javascript" || contentType === "application/javascript";
 }
 
+function parseBundleMode(searchParams: URLSearchParams): NormalizedBuildOptions["bundleMode"] {
+  if (searchParams.has("no-bundle") || searchParams.get("bundle") === "false") {
+    return "none";
+  }
+  if (searchParams.has("standalone")) {
+    return "standalone";
+  }
+  if (searchParams.has("bundle")) {
+    return "bundle";
+  }
+
+  return "smart";
+}
+
 export async function transformSource(
   code: string,
   filename: string,
@@ -262,6 +325,90 @@ function getEsbuildLoader(filename: string): esbuild.Loader {
   if (filename.endsWith(".jsx")) return "jsx";
   if (filename.endsWith(".json")) return "json";
   return "js";
+}
+
+function createPackageInternalBundlePlugin(
+  registry: string,
+  packageName: string,
+  version: string
+): esbuild.Plugin {
+  return {
+    name: "unpkg-package-internal",
+    setup(build) {
+      build.onResolve({ filter: /.*/ }, (args) => {
+        if (args.kind === "entry-point") {
+          return null;
+        }
+
+        if (isBareSpecifier(args.path) || isValidUrl(args.path)) {
+          return { path: args.path, external: true };
+        }
+
+        let resolved = path.posix.normalize(path.posix.join(args.resolveDir || "/", args.path));
+        if (!resolved.startsWith("/")) {
+          resolved = `/${resolved}`;
+        }
+
+        return {
+          path: resolved,
+          namespace: "unpkg-package",
+        };
+      });
+
+      build.onLoad({ filter: /.*/, namespace: "unpkg-package" }, async (args) => {
+        let file = await getFirstExistingSourceFile(registry, packageName, version, args.path);
+        if (file == null) {
+          return {
+            errors: [{ text: `File not found: ${args.path}` }],
+          };
+        }
+
+        return {
+          contents: new TextDecoder().decode(file.body),
+          loader: getEsbuildLoader(file.path),
+          resolveDir: path.posix.dirname(file.path),
+        };
+      });
+    },
+  };
+}
+
+async function getFirstExistingSourceFile(
+  registry: string,
+  packageName: string,
+  version: string,
+  filename: string
+): Promise<{ body: Uint8Array; path: string } | null> {
+  for (let candidate of getSourceFileCandidates(filename)) {
+    let file = await getFile(registry, packageName, version, candidate);
+    if (file != null && isSupportedSourceFile(candidate)) {
+      return {
+        body: file.body,
+        path: candidate,
+      };
+    }
+  }
+
+  return null;
+}
+
+function getSourceFileCandidates(filename: string): string[] {
+  if (/\.[cm]?[jt]sx?$/.test(filename)) {
+    return [filename];
+  }
+
+  return [
+    filename,
+    `${filename}.js`,
+    `${filename}.mjs`,
+    `${filename}.jsx`,
+    `${filename}.ts`,
+    `${filename}.tsx`,
+    `${stripTrailingSlash(filename)}/index.js`,
+    `${stripTrailingSlash(filename)}/index.mjs`,
+    `${stripTrailingSlash(filename)}/index.ts`,
+    `${stripTrailingSlash(filename)}/index.tsx`,
+  ];
 }
 
 function isSupportedSourceFile(filename: string): boolean {
