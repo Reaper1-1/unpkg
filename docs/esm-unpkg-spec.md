@@ -524,7 +524,8 @@ The implementation should preserve a clear boundary between edge request handlin
 
 Recommended components:
 
-- `packages/unpkg-www`: route `esm.unpkg.com` traffic at the Cloudflare Worker layer, normalize URLs, parse query parameters, handle redirects, serve cached artifacts, and call the build service on misses.
+- `packages/unpkg-esm`: route `esm.unpkg.com` traffic at the Cloudflare Worker layer, normalize URLs, parse query parameters, handle redirects, serve cached artifacts, and call the build service on misses.
+- `packages/unpkg-www`: continue to serve the main `unpkg.com` website and file CDN surface.
 - `packages/unpkg-worker`: share package parsing, npm metadata lookup, package export resolution, import rewriting, cache helpers, and diagnostics.
 - `packages/unpkg-files`: continue to provide npm package tarball/file access and add origin build endpoints for CPU-heavy transforms.
 - New build service module or package inside or next to `unpkg-files`: encapsulate bundler integration, dependency graph construction, transform options, source maps, declaration metadata, and artifact generation.
@@ -673,7 +674,7 @@ The implementation should be built in vertical slices. Each phase should ship te
 
 Primary files and modules:
 
-- Add an `esm.unpkg.com` route in `packages/unpkg-www`.
+- Add a dedicated `packages/unpkg-esm` Worker with production and staging routes for `esm.unpkg.com` and `esm.unpkg.dev`.
 - Add shared URL parsing and query normalization helpers in `packages/unpkg-worker`.
 - Reuse existing npm metadata and file helpers from `packages/unpkg-worker`.
 

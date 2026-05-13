@@ -55,6 +55,28 @@ importers:
         specifier: ^4.3.0
         version: 4.7.0(@cloudflare/workers-types@4.20250403.0)
 
+  packages/unpkg-esm:
+    dependencies:
+      unpkg-worker:
+        specifier: workspace:*
+        version: link:../unpkg-worker
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20250320.0
+        version: 4.20250403.0
+      '@types/bun':
+        specifier: ^1.2.8
+        version: 1.2.8
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.10.2
+      unpkg-files:
+        specifier: workspace:*
+        version: link:../unpkg-files
+      wrangler:
+        specifier: ^4.3.0
+        version: 4.7.0(@cloudflare/workers-types@4.20250403.0)
+
   packages/unpkg-files:
     dependencies:
       chalk:

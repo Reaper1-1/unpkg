@@ -5,8 +5,9 @@ This repository powers UNPKG, a CDN and web app for serving npm package files di
 ## Repository Structure
 
 - This is a pnpm workspace. Root scripts fan out to the packages under `packages/*`.
-- `packages/unpkg-www` is the main `unpkg.com` Cloudflare Worker, including the `esm.unpkg.com` routing layer.
+- `packages/unpkg-www` is the main `unpkg.com` Cloudflare Worker.
 - `packages/unpkg-app` is the app/browse Cloudflare Worker.
+- `packages/unpkg-esm` is the `esm.unpkg.com` Cloudflare Worker. It owns ESM-specific routing, metadata, raw/build proxying, inline transforms, and esm.sh-compatible request behavior.
 - `packages/unpkg-files` is the Bun-based origin file server. Package file reads, tarball handling, and ESM build/transform work live here.
 - `packages/unpkg-worker` contains shared Cloudflare Worker utilities used by the worker packages.
 - `scripts` contains repo-level maintenance and compatibility runners, including the ESM compatibility, browser smoke, readiness, and corpus generation tools.
@@ -28,6 +29,7 @@ This repository powers UNPKG, a CDN and web app for serving npm package files di
 - Start local development servers with the package `dev` scripts:
   - `pnpm --filter unpkg-www dev` for the main Worker on port 3000.
   - `pnpm --filter unpkg-app dev` for the app Worker on port 3001.
+  - `pnpm --filter unpkg-esm dev` for the ESM Worker on port 3002.
   - `pnpm --filter unpkg-files dev` for the Bun file server on port 4000.
 
 ## ESM Compatibility Tools
