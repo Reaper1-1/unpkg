@@ -861,6 +861,12 @@ Exit criteria:
 - All intentional gaps are documented.
 - Rollback is possible by disabling the `esm.unpkg.com` route without affecting `unpkg.com`.
 
+Implementation notes:
+
+- The representative runner lives at `scripts/esm-compat-suite.ts` and is exposed as `pnpm test:esm-compat`.
+- The public compatibility matrix and beta launch checklist live in `docs/esm-unpkg-compatibility.md`.
+- The runner defaults to `https://esm.unpkg.com` and can be pointed at beta/staging with `ESM_UNPKG_ORIGIN`.
+
 ## Acceptance Criteria
 
 - `https://esm.unpkg.com/react@18.3.1` returns valid browser ESM with correct headers.
