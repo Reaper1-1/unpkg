@@ -93,7 +93,7 @@ describe("handleRequest", () => {
       ASSETS_ORIGIN: "https://unpkg.dev",
       ESM_ORIGIN: "https://esm.unpkg.dev",
       FILES_ORIGIN: "https://fly.unpkg.dev",
-      MODE: "staging",
+      MODE: "test",
       ORIGIN: "https://unpkg.dev",
     };
     let response = await handleRequest(new Request("https://unpkg.dev/"), stagingEnv, context);
