@@ -421,14 +421,46 @@ export function Home({ esmOrigin, origin }: { esmOrigin: string; origin: string 
                 </CodeBlock>
               </div>
 
-              <p class="mt-8">
-                The helper reads <code class="text-sm bg-slate-100">data-filename</code>,{" "}
-                <code class="text-sm bg-slate-100">data-target</code>,{" "}
-                <code class="text-sm bg-slate-100">data-jsx</code>,{" "}
-                <code class="text-sm bg-slate-100">data-jsx-import-source</code>, and{" "}
-                <code class="text-sm bg-slate-100">data-dev</code> attributes when an inline script needs explicit
-                filename, JavaScript target, JSX, or development-mode settings.
-              </p>
+              <table class="mt-8 w-full text-left text-sm border-collapse">
+                <thead>
+                  <tr class="border-b border-slate-300">
+                    <th class="py-2 pr-4 font-semibold">Attribute</th>
+                    <th class="py-2 font-semibold">Use</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="border-b border-slate-200">
+                    <td class="py-2 pr-4 whitespace-nowrap">
+                      <code class="text-sm bg-slate-100">data-filename</code>
+                    </td>
+                    <td class="py-2">Names the inline file for extension inference and clearer diagnostics.</td>
+                  </tr>
+                  <tr class="border-b border-slate-200">
+                    <td class="py-2 pr-4 whitespace-nowrap">
+                      <code class="text-sm bg-slate-100">data-target</code>
+                    </td>
+                    <td class="py-2">Sets the JavaScript output target, such as <code>es2022</code>.</td>
+                  </tr>
+                  <tr class="border-b border-slate-200">
+                    <td class="py-2 pr-4 whitespace-nowrap">
+                      <code class="text-sm bg-slate-100">data-jsx</code>
+                    </td>
+                    <td class="py-2">Chooses JSX mode, such as <code>automatic</code>.</td>
+                  </tr>
+                  <tr class="border-b border-slate-200">
+                    <td class="py-2 pr-4 whitespace-nowrap">
+                      <code class="text-sm bg-slate-100">data-jsx-import-source</code>
+                    </td>
+                    <td class="py-2">Sets the JSX import source, such as <code>preact</code>.</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2 pr-4 whitespace-nowrap">
+                      <code class="text-sm bg-slate-100">data-dev</code>
+                    </td>
+                    <td class="py-2">Enables development-mode JSX output.</td>
+                  </tr>
+                </tbody>
+              </table>
             </section>
 
             <section id="browser-modules">
