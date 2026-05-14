@@ -421,6 +421,11 @@ export function Home({ esmOrigin, origin }: { esmOrigin: string; origin: string 
                 </CodeBlock>
               </div>
 
+              <p class="mt-8">
+                You can add the following attributes to inline{" "}
+                <code class="text-sm bg-slate-100">script</code> tags handled by <code>/run</code>:
+              </p>
+
               <table class="mt-8 w-full text-left text-sm border-collapse">
                 <thead>
                   <tr class="border-b border-slate-300">
