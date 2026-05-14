@@ -60,6 +60,12 @@ importers:
       highlight.js:
         specifier: ^11.11.1
         version: 11.11.1
+      preact:
+        specifier: ^10.25.2
+        version: 10.25.2
+      preact-render-to-string:
+        specifier: ^6.5.12
+        version: 6.5.12(preact@10.25.2)
       unpkg-worker:
         specifier: workspace:*
         version: link:../unpkg-worker

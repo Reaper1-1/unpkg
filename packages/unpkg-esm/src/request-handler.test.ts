@@ -117,9 +117,9 @@ describe("handleRequest", () => {
     expect(response.headers.get("Content-Type")).toMatch(/^text\/html/);
 
     let html = await response.text();
-    expect(html).toContain('<html lang="en" style="background-color: white;">');
-    expect(html).toContain('<body style="background-color: white;">');
-    expect(html).toContain('<link rel="icon" type="image/jpeg" href="/favicon.jpg">');
+    expect(html).toContain('<html lang="en" style="background-color:white;">');
+    expect(html).toContain('<body style="background-color:white;">');
+    expect(html).toContain('<link rel="icon" type="image/jpeg" href="/favicon.jpg"/>');
     expect(html).toContain("UNPKG ESM");
     expect(html).toContain("esm.unpkg.com is currently in beta.");
     expect(html).toContain("https://unpkg.com/#browser-modules");
