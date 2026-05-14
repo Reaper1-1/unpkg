@@ -126,6 +126,9 @@ describe("handleRequest", () => {
     expect(html).toContain("https://esm.unpkg.com/react@18.3.1");
     expect(html).toContain('href="https://github.com/unpkg"');
     expect(html).toContain('href="https://x.com/unpkg"');
+    expect(html).toContain('aria-label="UNPKG on GitHub"');
+    expect(html).toContain('aria-label="UNPKG on X"');
+    expect(html).toContain('viewBox="0 0 24 24"');
     expect(html).not.toContain("Packages are resolved from npm and served by UNPKG.");
     expect(html).not.toContain("Inline scripts");
     expect(html).not.toContain("https://unpkg.com/run");

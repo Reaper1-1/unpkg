@@ -114,6 +114,9 @@ describe("handleRequest", () => {
     expect(html).toContain(">esm.unpkg.com/react-dom@18/client<");
     expect(html).toContain('href="https://github.com/unpkg"');
     expect(html).toContain('href="https://x.com/unpkg"');
+    expect(html).toContain('aria-label="UNPKG on GitHub"');
+    expect(html).toContain('aria-label="UNPKG on X"');
+    expect(html).toContain('viewBox="0 0 24 24"');
     expect(html).not.toContain("react@18/client");
     expect(html).not.toContain('href="https://esm.unpkg.com/');
     expect(html).not.toContain("https://esm.unpkg.dev/tsx");
